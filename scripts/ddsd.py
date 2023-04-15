@@ -371,6 +371,7 @@ class Script(scripts.Script):
         seed = p_txt.seed
         
         original_scripts = p_txt.scripts.scripts.copy()
+        original_scripts_always = p_txt.scripts.alwayson_scripts.copy()
         p_txt.scripts.scripts = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) not in [__file__]]
         if not disable_random_control_net:
             controlnet = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) in ['controlnet.py']]
@@ -546,6 +547,7 @@ class Script(scripts.Script):
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
         p_txt.scripts.scripts = original_scripts
+        p_txt.scripts.alwayson_scripts = original_scripts_always
         return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
         
 def modeldataset(model_shortname):
