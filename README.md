@@ -1,8 +1,8 @@
 # sd-webui-ddsd
 Script that runs upscaler after running [detection detailer](https://github.com/dustysys/ddetailer).
 
-### Optional
-## Controlnet Random
+## Optional
+### Controlnet Random
 [Controlnet](https://github.com/Mikubill/sd-webui-controlnet) random sample image. usage glob.
 
 ## Installation
