@@ -386,7 +386,7 @@ class Script(scripts.Script):
                         files = glob(controlnet_search_folders[con_n], recursive=True)
                     else:
                         files = glob(controlnet_search_folders[con_n])
-                controlnet_image_files[con_n] = files.copy()
+                controlnet_image_files.append(files.copy())
         
         t2i_scripts = p_txt.scripts.scripts.copy()
         i2i_scripts = [x for x in t2i_scripts if os.path.basename(x.filename) in script_names_list]
