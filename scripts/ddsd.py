@@ -378,6 +378,15 @@ class Script(scripts.Script):
             controlnet = controlnet[0]
             controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to]
             controlnet_search_folders = list(args)
+            controlnet_image_files = []
+            for con_n, conet in enumerate(controlnet_args):
+                files = []
+                if conet.enabled:
+                    if '**' in controlnet_search_folders[con_n]:
+                        files = glob(controlnet_search_folders[con_n], recursive=True)
+                    else:
+                        files = glob(controlnet_search_folders[con_n])
+                controlnet_image_files[con_n] = files.copy()
         
         t2i_scripts = p_txt.scripts.scripts.copy()
         i2i_scripts = [x for x in t2i_scripts if os.path.basename(x.filename) in script_names_list]
@@ -408,20 +417,15 @@ class Script(scripts.Script):
             p_txt.scripts.alwayson_scripts = t2i_scripts_always
             if not disable_random_control_net:
                 for con_n, conet in enumerate(controlnet_args):
-                    if conet.enabled:
-                        if '**' in controlnet_search_folders[con_n]:
-                            files = glob(controlnet_search_folders[con_n], recursive=True)
-                        else:
-                            files = glob(controlnet_search_folders[con_n])
-                        if len(files) > 0:
-                            cn_image = Image.open(choice(files))
-                            cn_np = np.array(cn_image)
-                            if cn_image.mode == 'RGB':
-                                cn_np = np.concatenate([cn_np, 255*np.ones((cn_np.shape[0], cn_np.shape[1], 1), dtype=np.uint8)], axis=-1)
-                            cn_np_image = cn_np[:,:,:3].copy()
-                            cn_np_mask = cn_np
-                            cn_np_mask[:,:,:3] = 0
-                            conet.image = {'image':cn_np_image,'mask':cn_np_mask}
+                    if len(controlnet_image_files[con_n]) > 0:
+                        cn_image = Image.open(choice(controlnet_image_files[con_n]))
+                        cn_np = np.array(cn_image)
+                        if cn_image.mode == 'RGB':
+                            cn_np = np.concatenate([cn_np, 255*np.ones((cn_np.shape[0], cn_np.shape[1], 1), dtype=np.uint8)], axis=-1)
+                        cn_np_image = cn_np[:,:,:3].copy()
+                        cn_np_mask = cn_np
+                        cn_np_mask[:,:,:3] = 0
+                        conet.image = {'image':cn_np_image,'mask':cn_np_mask}
             processed = processing.process_images(p_txt)
             initial_info.append(processed.info)
             posi, nega = processed.all_prompts[0], processed.all_negative_prompts[0]
