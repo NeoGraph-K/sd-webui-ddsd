@@ -14,7 +14,7 @@ Inpainting with additional prompts after mask search with specific keywords. Add
     1. You need current CUDA and cuDNN version
     2. This is [CUDA 117](https://drive.google.com/file/d/1HRTOLTB44-pRcrwIw9lQak2OC2ohNle3/view?usp=share_link) and [cuDNN](https://drive.google.com/file/d/1QcgaxUra0WnCWrCLjsWp_QKw1PKcvqpj/view?usp=share_link)
 2. After installing CUDA, overwrite cuDNN in the folder where you installed CUDA
-3. Use `git clone https://github.com/NeoGraph-K/sd-webui-ddsd/tree/DinoDetect.git` from your SD web UI '/extensions' folder. Alternatively, install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd/tree/DinoDetect`
+3. Use `git clone https://github.com/NeoGraph-K/sd-webui-ddsd.git` from your SD web UI '/extensions' folder. Alternatively, install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd/tree/DinoDetect`
 4. Start Sd web UI
 5. It takes some time to install sam model and dino model
 
