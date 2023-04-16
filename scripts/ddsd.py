@@ -393,8 +393,8 @@ class Script(modules.scripts.Script):
                         processed = processing.process_images(p)
                         init_img = processed.images[0]
                     initial_info[-1] += ', '.join(['',f'{detect_index+1} DINO : {detect}', 
-                                                   f'{detect_index+1} DINO Positive : {dino_detect_positive_list[detect_index] if dino_detect_positive_list[detect_index] else "original"}', 
-                                                   f'{detect_index+1} DINO Negative : {dino_detect_negative_list[detect_index] if dino_detect_negative_list[detect_index] else "original"}'])
+                                                   f'{detect_index+1} DINO Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
+                                                   f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}'])
                     output_images[-1] = init_img
                     
             state.job = f"Generation {n + 1} out of {state.job_count} DDetailer"
