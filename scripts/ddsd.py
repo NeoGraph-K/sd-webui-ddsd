@@ -340,8 +340,8 @@ class Script(modules.scripts.Script):
             start_seed = seed + n
             print(f"Processing initial image for output generation {n + 1} (T2I).")
             p_txt.seed = start_seed
-            p_txt.scripts.scripts = t2i_scripts
-            p_txt.scripts.alwayson_scripts = t2i_scripts_always
+            p_txt.scripts.scripts = t2i_scripts.copy()
+            p_txt.scripts.alwayson_scripts = t2i_scripts_always.copy()
             if not disable_random_control_net:
                 for con_n, conet in enumerate(controlnet_args):
                     if len(controlnet_image_files[con_n]) > 0:
@@ -363,8 +363,8 @@ class Script(modules.scripts.Script):
             
             if not disable_detailer:
                 assert dino_detection_prompt, 'Please Input DINO Detect Prompt'
-                p.scripts.scripts = i2i_scripts
-                p.scripts.alwayson_scripts = i2i_scripts_always
+                p.scripts.scripts = i2i_scripts.copy()
+                p.scripts.alwayson_scripts = i2i_scripts_always.copy()
                 dino_detect_list = [x for x in dino_detection_prompt.split(';') if len(x) > 0]
                 assert len(dino_detect_list) > 0, 'Please Input DINO Detect Prompt(ex - A;B)'
                 dino_detect_positive_list = dino_detection_positive.split(';')
@@ -428,15 +428,15 @@ class Script(modules.scripts.Script):
                 print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
 
                 p2.seed = start_seed
-
+                p2.scripts.scripts = i2i_scripts.copy()
+                p2.scripts.alwayson_scripts = i2i_scripts_always.copy()
+                
                 work_results = []
                 for i in range(batch_count):
                     p2.batch_size = batch_size
                     p2.init_images = work[i*batch_size:(i+1)*batch_size]
 
                     state.job = f"Batch {i + 1 + n * batch_count} out of {state.job_count}"
-                    p2.scripts.scripts = i2i_scripts
-                    p2.scripts.alwayson_scripts = i2i_scripts_always
                     processed = processing.process_images(p2)
 
                     p2.seed = processed.seed + 1
@@ -450,6 +450,6 @@ class Script(modules.scripts.Script):
                 output_images[n] = images.combine_grid(grid)
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-        p_txt.scripts.scripts = original_scripts
-        p_txt.scripts.alwayson_scripts = original_scripts_always
+        p_txt.scripts.scripts = original_scripts.copy()
+        p_txt.scripts.alwayson_scripts = original_scripts_always.copy()
         return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
