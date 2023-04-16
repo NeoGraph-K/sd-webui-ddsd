@@ -1,26 +1,28 @@
 import os
-import sys
-import cv2
 import math
-import copy
 from random import choice
 from glob import glob
 
-import modules.scripts as scripts
 import gradio as gr
 import numpy as np
 from PIL import Image
 
-from modules import processing, shared, sd_samplers, images, devices, scripts, script_callbacks, modelloader
-from modules.processing import Processed, process_images, fix_seed, StableDiffusionProcessingImg2Img, StableDiffusionProcessingTxt2Img
-from modules.shared import opts, cmd_opts, state
+from scripts.sam import sam_predict, sam_model_list
+from scripts.dino import dino_model_list
+from scripts.ddsd_utils import combine_masks
 
+import modules
+from modules import processing, shared, images, devices, modelloader
+from modules.processing import Processed, StableDiffusionProcessingImg2Img
+from modules.shared import opts, state
 from modules.sd_models import model_hash
 from modules.paths import models_path
+
 from basicsr.utils.download_util import load_file_from_url
 
 dd_models_path = os.path.join(models_path, "mmdet")
-
+grounding_models_path = os.path.join(models_path, "grounding")
+sam_models_path = os.path.join(models_path, "sam")
 
 def list_models(model_path):
         model_list = modelloader.load_models(model_path=model_path, ext_filter=[".pth"])
@@ -49,28 +51,26 @@ def list_models(model_path):
         return models
         
 def startup():
-    from launch import is_installed, run
-    if not is_installed("mmdet"):
-        python = sys.executable
-        run(f'"{python}" -m pip install -U openmim==0.3.7', desc="Installing openmim", errdesc="Couldn't install openmim")
-        run(f'"{python}" -m mim install mmcv-full==1.7.1', desc=f"Installing mmcv-full", errdesc=f"Couldn't install mmcv-full")
-        run(f'"{python}" -m pip install mmdet==2.28.2', desc=f"Installing mmdet", errdesc=f"Couldn't install mmdet")
-
-    if (len(list_models(dd_models_path)) == 0):
-        print("No detection models found, downloading...")
-        bbox_path = os.path.join(dd_models_path, "bbox")
-        segm_path = os.path.join(dd_models_path, "segm")
-        load_file_from_url("https://huggingface.co/dustysys/ddetailer/resolve/main/mmdet/bbox/mmdet_anime-face_yolov3.pth", bbox_path)
-        load_file_from_url("https://huggingface.co/dustysys/ddetailer/raw/main/mmdet/bbox/mmdet_anime-face_yolov3.py", bbox_path)
-        load_file_from_url("https://huggingface.co/dustysys/ddetailer/resolve/main/mmdet/segm/mmdet_dd-person_mask2former.pth", segm_path)
-        load_file_from_url("https://huggingface.co/dustysys/ddetailer/raw/main/mmdet/segm/mmdet_dd-person_mask2former.py", segm_path)
+    if (len(list_models(grounding_models_path)) == 0):
+        print("No detection groundingdino models found, downloading...")
+        load_file_from_url('https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth',grounding_models_path)
+        load_file_from_url('https://raw.githubusercontent.com/IDEA-Research/GroundingDINO/main/groundingdino/config/GroundingDINO_SwinT_OGC.py',grounding_models_path, file_name='groundingdino_swint_ogc.py')
+        #load_file_from_url('https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swinb_cogcoor.pth',grounding_models_path)
+        #load_file_from_url('https://raw.githubusercontent.com/IDEA-Research/GroundingDINO/main/groundingdino/config/GroundingDINO_SwinB.cfg.py',grounding_models_path, file_name='groundingdino_swinb_cogcoor.py')
+        
+        
+    if (len(list_models(sam_models_path)) == 0):
+        print("No detection sam models found, downloading...")
+        #load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth',sam_models_path)
+        #load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth',sam_models_path)
+        load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth',sam_models_path)
 
 startup()
 
 def gr_show(visible=True):
     return {"visible": visible, "__type__": "update"}
 
-class Script(scripts.Script):
+class Script(modules.scripts.Script):
     def title(self):
         return "ddetailer + sdupscale"
 
@@ -78,13 +78,9 @@ class Script(scripts.Script):
         return not is_img2img
 
     def ui(self, is_img2img):
-        import modules.ui
-
         sample_list = [x.name for x in shared.list_samplers()]
         sample_list = [x for x in sample_list if x not in ['PLMS','UniPC','DDIM']]
         sample_list.insert(0,"Original")
-        model_list = list_models(dd_models_path)
-        model_list.insert(0, "None")
         ret = []
         
         with gr.Group():
@@ -92,9 +88,10 @@ class Script(scripts.Script):
             disable_random_control_net = gr.Checkbox(label='Disable Random Controlnet', value=True, visible=True)
             cn_models_num = shared.opts.data.get("control_net_max_models_num", 1)
             image_detectors = []
-            for n in range(cn_models_num):
-                cn_image_detect_folder = gr.Textbox(label=f"{n} Control Model Image Random Folder(Using glob)", elem_id=f"{n}_cn_image_detector", value='',show_label=True, lines=1, placeholder="search glob image folder and file extension. ex ) - ./base/**/*.png", visible=False)
-                image_detectors.append(cn_image_detect_folder)
+            with gr.Column():
+                for n in range(cn_models_num):
+                    cn_image_detect_folder = gr.Textbox(label=f"{n} Control Model Image Random Folder(Using glob)", elem_id=f"{n}_cn_image_detector", value='',show_label=True, lines=1, placeholder="search glob image folder and file extension. ex ) - ./base/**/*.png", visible=False)
+                    image_detectors.append(cn_image_detect_folder)
         
         disable_random_control_net.change(
             lambda disable:dict(zip(image_detectors,[gr_show(not disable)]*cn_models_num)),
@@ -108,14 +105,17 @@ class Script(scripts.Script):
         
         with gr.Group():
             sd_upscale_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I Upscaler Option</p>')
-            disable_upscaler = gr.Checkbox(label='Disable Upscaler', value=False, visible=True)
-            upscaler_sample = gr.Dropdown(label='Upscaler Sampling', choices=sample_list, value=sample_list[0], visible=True, type="value")
-            upscaler_index = gr.Dropdown(label='Upscaler', choices=[x.name for x in shared.sd_upscalers], value=shared.sd_upscalers[-1].name, type="index")
-            scalevalue = gr.Slider(minimum=1, maximum=16, step=0.5, label='Resize', value=2)
-            overlap = gr.Slider(minimum=0, maximum=256, step=32, label='Tile overlap', value=32)
-            rewidth = gr.Slider(minimum=0, maximum=1024, step=64, label='Width', value=512)
-            reheight = gr.Slider(minimum=0, maximum=1024, step=64, label='Height', value=512)
-            denoising_strength = gr.Slider(minimum=0, maximum=1.0, step=0.01, label='Denoising strength', value=0.1)
+            disable_upscaler = gr.Checkbox(label='Disable Upscaler', elem_id='disable_upscaler', value=False, visible=True)
+            with gr.Column():
+                with gr.Row():
+                    upscaler_sample = gr.Dropdown(label='Upscaler Sampling', elem_id='upscaler_sample', choices=sample_list, value=sample_list[0], visible=True, type="value")
+                    upscaler_index = gr.Dropdown(label='Upscaler', elem_id='upscaler_index', choices=[x.name for x in shared.sd_upscalers], value=shared.sd_upscalers[-1].name, type="index")
+                scalevalue = gr.Slider(minimum=1, maximum=16, step=0.5, elem_id='upscaler_scalevalue', label='Resize', value=2)
+                overlap = gr.Slider(minimum=0, maximum=256, step=32, elem_id='upscaler_overlap', label='Tile overlap', value=32)
+                with gr.Row():
+                    rewidth = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_rewidth', label='Width', value=512)
+                    reheight = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_reheight', label='Height', value=512)
+                denoising_strength = gr.Slider(minimum=0, maximum=1.0, step=0.01, elem_id='upscaler_denoising', label='Denoising strength', value=0.1)
 
         disable_upscaler.change(
             lambda disable: {
@@ -133,150 +133,76 @@ class Script(scripts.Script):
         
         with gr.Group():
             ddetailer_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I Detection Detailer Option</p>')
-            disable_detailer = gr.Checkbox(label='Disable DDetailer', value=False, visible=True)
-            detailer_sample = gr.Dropdown(label='Detailer Sampling', choices=sample_list, value=sample_list[0], visible=True, type="value")
-            if not is_img2img:
+            disable_detailer = gr.Checkbox(label='Disable Detection Detailer', elem_id='disable_detailer',value=False, visible=True)
+            detailer_sample = gr.Dropdown(label='Detailer Sampling', elem_id='detailer_sample', choices=sample_list, value=sample_list[0], visible=True, type="value")
+            with gr.Column():
                 with gr.Row():
-                    dd_prompt = gr.Textbox(label="dd_prompt", elem_id="t2i_dd_prompt", show_label=False, lines=3, placeholder="Ddetailer Prompt")
-
+                    detailer_sam_model = gr.Dropdown(label='Detailer SAM Model', elem_id='detailer_sam_model', choices=sam_model_list(), value=sam_model_list()[0], visible=True)
+                    detailer_dino_model = gr.Dropdown(label='Deteiler DINO Model', elem_id='detailer_dino_model', choices=dino_model_list(), value=dino_model_list()[0], visible=True)
+                with gr.Column():
+                    dino_detection_prompt = gr.Textbox(label="Detect Prompt", elem_id="detailer_detect_prompt", show_label=True, lines=2, placeholder="Detect Token Prompt(ex - face;hand)", visible=True)
+                    dino_detection_positive = gr.Textbox(label="Positive Prompt", elem_id="detailer_detect_positive", show_label=True, lines=3, placeholder="Detect Mask Inpaint Positive(ex - pureeros;red hair)", visible=True)
+                    dino_detection_negative = gr.Textbox(label="Negative Prompt", elem_id="detailer_detect_negative", show_label=True, lines=3, placeholder="Detect Mask Inpaint Negative(ex - easynagetive;nsfw)", visible=True)
+                    dino_detection_threshold = gr.Slider(label="Detect Threshold", elem_id='detailer_detect_threshold', show_label=True, minimum=0, maximum=1, step=0.01, value=0.3, visible=True)
                 with gr.Row():
-                    dd_neg_prompt = gr.Textbox(label="dd_neg_prompt", elem_id="t2i_dd_neg_prompt", show_label=False, lines=2, placeholder="Ddetailer Negative prompt")
-
-            with gr.Row():
-                dd_model_a = gr.Dropdown(label="Primary detection model (A)", choices=model_list,value = model_list[2], visible=True, type="value")
-            
-            with gr.Row():
-                dd_conf_a = gr.Slider(label='Detection confidence threshold % (A)', minimum=0, maximum=100, step=1, value=30, visible=True)
-                dd_dilation_factor_a = gr.Slider(label='Dilation factor (A)', minimum=0, maximum=255, step=1, value=4, visible=True)
-
-            with gr.Row():
-                dd_offset_x_a = gr.Slider(label='X offset (A)', minimum=-200, maximum=200, step=1, value=0, visible=True)
-                dd_offset_y_a = gr.Slider(label='Y offset (A)', minimum=-200, maximum=200, step=1, value=0, visible=True)
-            
-            with gr.Row():
-                dd_bitwise_op = gr.Radio(label='Bitwise operation', choices=['None', 'A&B', 'A-B'], value="A&B", visible=True)  
-        
-            br = gr.HTML("<br>")
-            
-            with gr.Row():
-                dd_model_b = gr.Dropdown(label="Secondary detection model (B) (optional)", choices=model_list,value = model_list[1], visible =True, type="value")
-
-            with gr.Row():
-                dd_conf_b = gr.Slider(label='Detection confidence threshold % (B)', minimum=0, maximum=100, step=1, value=30, visible=True)
-                dd_dilation_factor_b = gr.Slider(label='Dilation factor (B)', minimum=0, maximum=255, step=1, value=4, visible=True)
-            
-            with gr.Row():
-                dd_offset_x_b = gr.Slider(label='X offset (B)', minimum=-200, maximum=200, step=1, value=0, visible=True)
-                dd_offset_y_b = gr.Slider(label='Y offset (B)', minimum=-200, maximum=200, step=1, value=0, visible=True)
-        
-        with gr.Group():
-            with gr.Row():
-                dd_mask_blur = gr.Slider(label='Mask blur ', minimum=0, maximum=64, step=1, value=4, visible=(not is_img2img))
-                dd_denoising_strength = gr.Slider(label='Denoising strength (Inpaint)', minimum=0.0, maximum=1.0, step=0.01, value=0.4, visible=(not is_img2img))
-            
-            with gr.Row():
-                dd_inpaint_full_res = gr.Checkbox(label='Inpaint at full resolution ', value=True, visible = (not is_img2img))
-                dd_inpaint_full_res_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', minimum=0, maximum=256, step=4, value=32, visible=(not is_img2img))
+                    dino_full_res_inpaint = gr.Checkbox(label='Inpaint at full resolution ', elem_id='detailer_full_res', value=True, visible = True)
+                    dino_bitwise_option = gr.Radio(label='Bitwise operation', elem_id='detailer_bitwise', choices=['AND', 'OR', 'OTHER'], value='OR', visible=True)
+                with gr.Row():
+                    dino_dilation = gr.Slider(label='Dilation factor', elem_id='detailer_dilation', minimum=0, maximum=128, step=1, value=4, visible=True)
+                    dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=32, visible=True)
+                with gr.Row():
+                    detailer_mask_blur = gr.Slider(label='Detailer Blur', elem_id='detailer_mask_blur', minimum=0, maximum=64, step=1, value=4)
+                    detailer_denoise = gr.Slider(label='Detailer Denoise', elem_id='detailer_denoise', minimum=0, maximum=1, step=0.01, value=0.4)
 
         disable_detailer.change(
-            lambda disable,modelname_a,modelname_b:{
-                detailer_sample:gr_show((not disable)),
-                dd_prompt:gr_show((not disable)),
-                dd_neg_prompt:gr_show((not disable)),
-                dd_model_a:gr_show((not disable)),
-                dd_conf_a:gr_show((not disable) and (modelname_a != 'None')),
-                dd_dilation_factor_a:gr_show((not disable) and (modelname_a != 'None')),
-                dd_offset_x_a:gr_show((not disable) and (modelname_a != 'None')),
-                dd_offset_y_a:gr_show((not disable) and (modelname_a != 'None')),
-                dd_bitwise_op:gr_show((not disable) and (modelname_b != 'None')),
-                dd_model_b:gr_show((not disable)),
-                dd_conf_b:gr_show((not disable) and (modelname_b != 'None')),
-                dd_dilation_factor_b:gr_show((not disable) and (modelname_b != 'None')),
-                dd_offset_x_b:gr_show((not disable) and (modelname_b != 'None')),
-                dd_offset_y_b:gr_show((not disable) and (modelname_b != 'None')),
-                dd_mask_blur:gr_show((not disable)),
-                dd_denoising_strength:gr_show((not disable)),
-                dd_inpaint_full_res:gr_show((not disable)),
-                dd_inpaint_full_res_padding:gr_show((not disable))
+            lambda disable:{
+                detailer_sample:gr_show(not disable),
+                detailer_sam_model:gr_show(not disable),
+                detailer_dino_model:gr_show(not disable),
+                dino_detection_prompt:gr_show(not disable),
+                dino_detection_positive:gr_show(not disable),
+                dino_detection_negative:gr_show(not disable),
+                dino_detection_threshold:gr_show(not disable),
+                dino_full_res_inpaint:gr_show(not disable),
+                dino_bitwise_option:gr_show(not disable),
+                dino_dilation:gr_show(not disable),
+                dino_inpaint_padding:gr_show(not disable),
+                detailer_denoise:gr_show(not disable),
+                detailer_mask_blur:gr_show(not disable)
             },
-            inputs=[disable_detailer,dd_model_a,dd_model_b],
+            inputs=[disable_detailer],
             outputs=[
                 detailer_sample,
-                dd_prompt,
-                dd_neg_prompt,
-                dd_model_a,
-                dd_conf_a,
-                dd_dilation_factor_a,
-                dd_offset_x_a,
-                dd_offset_y_a,
-                dd_bitwise_op,
-                dd_model_b,
-                dd_conf_b,
-                dd_dilation_factor_b,
-                dd_offset_x_b,
-                dd_offset_y_b,
-                dd_mask_blur,
-                dd_denoising_strength,
-                dd_inpaint_full_res,
-                dd_inpaint_full_res_padding
+                detailer_sam_model,
+                detailer_dino_model,
+                dino_detection_prompt,
+                dino_detection_positive,
+                dino_detection_negative,
+                dino_detection_threshold,
+                dino_full_res_inpaint,
+                dino_bitwise_option,
+                dino_dilation,
+                dino_inpaint_padding,
+                detailer_denoise,
+                detailer_mask_blur
             ]
         )
         
-        dd_model_a.change(
-            lambda modelname: {
-                dd_model_b:gr_show( modelname != "None" ),
-                dd_conf_a:gr_show( modelname != "None" ),
-                dd_dilation_factor_a:gr_show( modelname != "None"),
-                dd_offset_x_a:gr_show( modelname != "None" ),
-                dd_offset_y_a:gr_show( modelname != "None" )
-
-            },
-            inputs= [dd_model_a],
-            outputs =[dd_model_b, dd_conf_a, dd_dilation_factor_a, dd_offset_x_a, dd_offset_y_a]
-        )
-
-        dd_model_b.change(
-            lambda modelname: {
-                dd_bitwise_op:gr_show( modelname != "None" ),
-                dd_conf_b:gr_show( modelname != "None" ),
-                dd_dilation_factor_b:gr_show( modelname != "None"),
-                dd_offset_x_b:gr_show( modelname != "None" ),
-                dd_offset_y_b:gr_show( modelname != "None" )
-            },
-            inputs= [dd_model_b],
-            outputs =[dd_bitwise_op, dd_conf_b, dd_dilation_factor_b, dd_offset_x_b, dd_offset_y_b]
-        )
-        
-        ret += [disable_random_control_net, disable_upscaler, disable_detailer, enable_script_names, scalevalue, upscaler_sample, detailer_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
-        ret += [dd_model_a, 
-                dd_conf_a, dd_dilation_factor_a,
-                dd_offset_x_a, dd_offset_y_a,
-                dd_bitwise_op, 
-                br,
-                dd_model_b,
-                dd_conf_b, dd_dilation_factor_b,
-                dd_offset_x_b, dd_offset_y_b,  
-                dd_mask_blur, dd_denoising_strength,
-                dd_inpaint_full_res, dd_inpaint_full_res_padding
-        ]
-        ret += [dd_prompt, dd_neg_prompt]
+        ret += [enable_script_names]
+        ret += [disable_random_control_net]
+        ret += [disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
+        ret += [disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative, dino_detection_threshold, dino_full_res_inpaint, dino_bitwise_option, dino_dilation, dino_inpaint_padding, detailer_denoise, detailer_mask_blur]
         ret += image_detectors
 
         return ret
 
-    def run(self, p, disable_random_control_net, disable_upscaler, disable_detailer, enable_script_names, 
-                     scalevalue, upscaler_sample, detailer_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
-                     dd_model_a, 
-                     dd_conf_a, dd_dilation_factor_a,
-                     dd_offset_x_a, dd_offset_y_a,
-                     dd_bitwise_op, 
-                     br,
-                     dd_model_b,
-                     dd_conf_b, dd_dilation_factor_b,
-                     dd_offset_x_b, dd_offset_y_b,  
-                     dd_mask_blur, dd_denoising_strength,
-                     dd_inpaint_full_res, dd_inpaint_full_res_padding,
-                     dd_prompt, dd_neg_prompt, *args):
+    def run(self, p, 
+            enable_script_names,
+            disable_random_control_net, 
+            disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
+            disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative, dino_detection_threshold,
+            dino_full_res_inpaint, dino_bitwise_option, dino_dilation, dino_inpaint_padding, detailer_denoise, detailer_mask_blur,
+            *args):
         processing.fix_seed(p)
         initial_info = []
         initial_prompt = []
@@ -295,12 +221,12 @@ class Script(scripts.Script):
         p = StableDiffusionProcessingImg2Img(
                 init_images = None,
                 resize_mode = 0,
-                denoising_strength = dd_denoising_strength,
+                denoising_strength = detailer_denoise,
                 mask = None,
-                mask_blur= dd_mask_blur,
+                mask_blur= detailer_mask_blur,
                 inpainting_fill = 1,
-                inpaint_full_res = dd_inpaint_full_res,
-                inpaint_full_res_padding= dd_inpaint_full_res_padding,
+                inpaint_full_res = dino_full_res_inpaint,
+                inpaint_full_res_padding= dino_inpaint_padding,
                 inpainting_mask_invert= 0,
                 sd_model=p_txt.sd_model,
                 outpath_samples=p_txt.outpath_samples,
@@ -353,12 +279,12 @@ class Script(scripts.Script):
             tiling=p_txt.tiling,
             init_images=[],
             mask=None,
-            mask_blur=dd_mask_blur,
+            mask_blur=detailer_mask_blur,
             inpainting_fill=1,
             resize_mode=0,
             denoising_strength=denoising_strength,
-            inpaint_full_res=dd_inpaint_full_res,
-            inpaint_full_res_padding=dd_inpaint_full_res_padding,
+            inpaint_full_res=dino_full_res_inpaint,
+            inpaint_full_res_padding=dino_inpaint_padding,
             inpainting_mask_invert=0,
         )
         p2.do_not_save_grid = True
@@ -430,68 +356,46 @@ class Script(scripts.Script):
             processed = processing.process_images(p_txt)
             initial_info.append(processed.info)
             posi, nega = processed.all_prompts[0], processed.all_negative_prompts[0]
+            
             initial_prompt.append(posi)
             initial_negative.append(nega)
-            p.prompt = posi if dd_prompt == '' else dd_prompt
-            p.negative_prompt = nega if dd_neg_prompt == '' else dd_neg_prompt
-            init_image = processed.images[0]
+            output_images.append(processed.images[0])
             
-            output_images.append(init_image)
-            masks_a = []
             if not disable_detailer:
-                if (dd_model_a != "None"):
-                    label_a = "A"
-                    if (dd_model_b != "None" and dd_bitwise_op != "None"):
-                        label_a = dd_bitwise_op
-                    results_a = inference(init_image, dd_model_a, dd_conf_a/100.0, label_a)
-                    masks_a = create_segmasks(results_a)
-                    masks_a = dilate_masks(masks_a, dd_dilation_factor_a, 1)
-                    masks_a = offset_masks(masks_a,dd_offset_x_a, dd_offset_y_a)
-                    if (dd_model_b != "None" and dd_bitwise_op != "None"):
-                        label_b = "B"
-                        results_b = inference(init_image, dd_model_b, dd_conf_b/100.0, label_b)
-                        masks_b = create_segmasks(results_b)
-                        masks_b = dilate_masks(masks_b, dd_dilation_factor_b, 1)
-                        masks_b = offset_masks(masks_b,dd_offset_x_b, dd_offset_y_b)
-                        if (len(masks_b) > 0):
-                            combined_mask_b = combine_masks(masks_b)
-                            for i in reversed(range(len(masks_a))):
-                                if (dd_bitwise_op == "A&B"):
-                                    masks_a[i] = bitwise_and_masks(masks_a[i], combined_mask_b)
-                                elif (dd_bitwise_op == "A-B"):
-                                    masks_a[i] = subtract_masks(masks_a[i], combined_mask_b)
-                                if (is_allblack(masks_a[i])):
-                                    del masks_a[i]
-                                    for result in results_a:
-                                        del result[i]
-                                        
-                        else:
-                            print("No model B detections to overlap with model A masks")
-                            results_a = []
-                            masks_a = []
-                    
-                    if (len(masks_a) > 0):
-                        results_a = update_result_masks(results_a, masks_a)
-                        gen_count = len(masks_a)
-                        state.job_count += gen_count
-                        print(f"Processing {gen_count} model {label_a} detections for output generation {n + 1} (I2I).")
-                        p.seed = start_seed
-                        p.init_images = [init_image]
-
-                        for i in range(gen_count):
-                            p.image_mask = masks_a[i]
-                            
-                            p.scripts.scripts = i2i_scripts
-                            p.scripts.alwayson_scripts = i2i_scripts_always
+                assert dino_detection_prompt, 'Please Input DINO Detect Prompt'
+                p.scripts.scripts = i2i_scripts
+                p.scripts.alwayson_scripts = i2i_scripts_always
+                dino_detect_list = [x for x in dino_detection_prompt.split(';') if len(x) > 0]
+                assert len(dino_detect_list) > 0, 'Please Input DINO Detect Prompt(ex - A;B)'
+                dino_detect_positive_list = dino_detection_positive.split(';')
+                while len(dino_detect_positive_list) < len(dino_detect_list):
+                    dino_detect_positive_list.append('')
+                dino_detect_negative_list = dino_detection_negative.split(';')
+                while len(dino_detect_negative_list) < len(dino_detect_list):
+                    dino_detect_negative_list.append('')
+                dino_detect_positive_list = [x.strip() for x in dino_detect_positive_list]
+                dino_detect_negative_list = [x.strip() for x in dino_detect_negative_list]
+                
+                init_img = output_images[-1]
+                for detect_index, detect in enumerate(dino_detect_list):
+                    masks = sam_predict(detailer_sam_model, detailer_dino_model, init_img, detect, dino_detection_threshold, dino_dilation)
+                    p.prompt = dino_detect_positive_list[detect_index] if dino_detect_positive_list[detect_index] else initial_prompt[-1]
+                    p.negative_prompt = dino_detect_negative_list[detect_index] if dino_detect_negative_list[detect_index] else initial_negative[-1]
+                    if dino_bitwise_option == 'OTHER':
+                        for mask in masks:
+                            p.init_images = [init_img]
+                            p.image_mask = mask
                             processed = processing.process_images(p)
-                            p.seed = processed.seed + 1
-                            p.init_images = processed.images
-                        
-                        if (gen_count > 0):
-                            output_images[n] = processed.images[0]
-    
-                    else: 
-                        print(f"No model {label_a} detections for output generation {n} with current settings.")
+                            init_img = processed.images[0]
+                    else:
+                        p.init_images = [init_img]
+                        p.image_mask = combine_masks(masks, dino_bitwise_option)
+                        processed = processing.process_images(p)
+                        init_img = processed.images[0]
+                    initial_info[-1] += ', '.join(['',f'{detect_index+1} DINO : {detect}', 
+                                                   f'{detect_index+1} DINO Positive : {dino_detect_positive_list[detect_index] if dino_detect_positive_list[detect_index] else "original"}', 
+                                                   f'{detect_index+1} DINO Negative : {dino_detect_negative_list[detect_index] if dino_detect_negative_list[detect_index] else "original"}'])
+                    output_images[-1] = init_img
                     
             state.job = f"Generation {n + 1} out of {state.job_count} DDetailer"
             if not disable_upscaler:
@@ -549,165 +453,3 @@ class Script(scripts.Script):
         p_txt.scripts.scripts = original_scripts
         p_txt.scripts.alwayson_scripts = original_scripts_always
         return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
-        
-def modeldataset(model_shortname):
-    path = modelpath(model_shortname)
-    if ("mmdet" in path and "segm" in path):
-        dataset = 'coco'
-    else:
-        dataset = 'bbox'
-    return dataset
-
-def modelpath(model_shortname):
-    model_list = modelloader.load_models(model_path=dd_models_path, ext_filter=[".pth"])
-    model_h = model_shortname.split("[")[-1].split("]")[0]
-    for path in model_list:
-        if ( model_hash(path) == model_h):
-            return path
-
-def update_result_masks(results, masks):
-    for i in range(len(masks)):
-        boolmask = np.array(masks[i], dtype=bool)
-        results[2][i] = boolmask
-    return results
-
-def is_allblack(mask):
-    cv2_mask = np.array(mask)
-    return cv2.countNonZero(cv2_mask) == 0
-
-def bitwise_and_masks(mask1, mask2):
-    cv2_mask1 = np.array(mask1)
-    cv2_mask2 = np.array(mask2)
-    cv2_mask = cv2.bitwise_and(cv2_mask1, cv2_mask2)
-    mask = Image.fromarray(cv2_mask)
-    return mask
-
-def subtract_masks(mask1, mask2):
-    cv2_mask1 = np.array(mask1)
-    cv2_mask2 = np.array(mask2)
-    cv2_mask = cv2.subtract(cv2_mask1, cv2_mask2)
-    mask = Image.fromarray(cv2_mask)
-    return mask
-
-def dilate_masks(masks, dilation_factor, iter=1):
-    if dilation_factor == 0:
-        return masks
-    dilated_masks = []
-    kernel = np.ones((dilation_factor,dilation_factor), np.uint8)
-    for i in range(len(masks)):
-        cv2_mask = np.array(masks[i])
-        dilated_mask = cv2.dilate(cv2_mask, kernel, iter)
-        dilated_masks.append(Image.fromarray(dilated_mask))
-    return dilated_masks
-
-def offset_masks(masks, offset_x, offset_y):
-    if (offset_x == 0 and offset_y == 0):
-        return masks
-    offset_masks = []
-    for i in range(len(masks)):
-        cv2_mask = np.array(masks[i])
-        offset_mask = cv2_mask.copy()
-        offset_mask = np.roll(offset_mask, -offset_y, axis=0)
-        offset_mask = np.roll(offset_mask, offset_x, axis=1)
-        
-        offset_masks.append(Image.fromarray(offset_mask))
-    return offset_masks
-
-def combine_masks(masks):
-    initial_cv2_mask = np.array(masks[0])
-    combined_cv2_mask = initial_cv2_mask
-    for i in range(1, len(masks)):
-        cv2_mask = np.array(masks[i])
-        combined_cv2_mask = cv2.bitwise_or(combined_cv2_mask, cv2_mask)
-    
-    combined_mask = Image.fromarray(combined_cv2_mask)
-    return combined_mask
-
-def create_segmasks(results):
-    segms = results[2]
-    segmasks = []
-    for i in range(len(segms)):
-        cv2_mask = segms[i].astype(np.uint8) * 255
-        mask = Image.fromarray(cv2_mask)
-        segmasks.append(mask)
-
-    return segmasks
-
-import mmcv
-from mmdet.core import get_classes
-from mmdet.apis import (inference_detector,
-                        init_detector)
-
-def get_device():
-    device_id = shared.cmd_opts.device_id
-    if device_id is not None:
-        cuda_device = f"cuda:{device_id}"
-    else:
-        cuda_device = "cpu"
-    return cuda_device
-
-def inference(image, modelname, conf_thres, label):
-    path = modelpath(modelname)
-    if ( "mmdet" in path and "bbox" in path ):
-        results = inference_mmdet_bbox(image, modelname, conf_thres, label)
-    elif ( "mmdet" in path and "segm" in path):
-        results = inference_mmdet_segm(image, modelname, conf_thres, label)
-    return results
-
-def inference_mmdet_segm(image, modelname, conf_thres, label):
-    model_checkpoint = modelpath(modelname)
-    model_config = os.path.splitext(model_checkpoint)[0] + ".py"
-    model_device = get_device()
-    model = init_detector(model_config, model_checkpoint, device=model_device)
-    mmdet_results = inference_detector(model, np.array(image))
-    bbox_results, segm_results = mmdet_results
-    dataset = modeldataset(modelname)
-    classes = get_classes(dataset)
-    labels = [
-        np.full(bbox.shape[0], i, dtype=np.int32)
-        for i, bbox in enumerate(bbox_results)
-    ]
-    n,m = bbox_results[0].shape
-    if (n == 0):
-        return [[],[],[]]
-    labels = np.concatenate(labels)
-    bboxes = np.vstack(bbox_results)
-    segms = mmcv.concat_list(segm_results)
-    filter_inds = np.where(bboxes[:,-1] > conf_thres)[0]
-    results = [[],[],[]]
-    for i in filter_inds:
-        results[0].append(label + "-" + classes[labels[i]])
-        results[1].append(bboxes[i])
-        results[2].append(segms[i])
-
-    return results
-
-def inference_mmdet_bbox(image, modelname, conf_thres, label):
-    model_checkpoint = modelpath(modelname)
-    model_config = os.path.splitext(model_checkpoint)[0] + ".py"
-    model_device = get_device()
-    model = init_detector(model_config, model_checkpoint, device=model_device)
-    results = inference_detector(model, np.array(image))
-    cv2_image = np.array(image)
-    cv2_image = cv2_image[:, :, ::-1].copy()
-    cv2_gray = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2GRAY)
-
-    segms = []
-    for (x0, y0, x1, y1, conf) in results[0]:
-        cv2_mask = np.zeros((cv2_gray.shape), np.uint8)
-        cv2.rectangle(cv2_mask, (int(x0), int(y0)), (int(x1), int(y1)), 255, -1)
-        cv2_mask_bool = cv2_mask.astype(bool)
-        segms.append(cv2_mask_bool)
-    
-    n,m = results[0].shape
-    if (n == 0):
-        return [[],[],[]]
-    bboxes = np.vstack(results[0])
-    filter_inds = np.where(bboxes[:,-1] > conf_thres)[0]
-    results = [[],[],[]]
-    for i in filter_inds:
-        results[0].append(label)
-        results[1].append(bboxes[i])
-        results[2].append(segms[i])
-
-    return results
