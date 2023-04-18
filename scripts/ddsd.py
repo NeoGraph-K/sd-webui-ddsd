@@ -384,12 +384,12 @@ class Script(modules.scripts.Script):
                         p.seed = processed.seed + 1
                         init_img = processed.images[0]
                     else: state.job_count -= 1
-                    initial_info[n] += ', '.join(['',f'{detect_index+1} DINO : {detect_prompt}', 
-                                                   f'{detect_index+1} DINO Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
-                                                   f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}',
-                                                   f'{detect_index+1} DINO Denoising : {p.denoising_strength}', 
-                                                   f'{detect_index+1} DINO CFG Scale : {p.cfg_scale}', 
-                                                   f'{detect_index+1} DINO Steps : {p.steps}'])
+                    initial_info[n] += ', '.join(['',f'DINO {detect_index+1} : {detect_prompt}', 
+                                                   f'DINO {detect_index+1} Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
+                                                   f'DINO {detect_index+1} Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}',
+                                                   f'DINO {detect_index+1} Denoising : {p.denoising_strength}', 
+                                                   f'DINO {detect_index+1} CFG Scale : {p.cfg_scale}', 
+                                                   f'DINO {detect_index+1} Steps : {p.steps}'])
                     if shared.opts.data.get('save_ddsd_working_on_images', False):
                         images.save_image(init_img, p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                     output_images[n] = init_img
