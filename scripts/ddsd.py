@@ -290,7 +290,7 @@ class Script(modules.scripts.Script):
             controlnet = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) in ['controlnet.py']]
             assert len(controlnet) > 0, 'Do not find controlnet, please install controlnet or disable random control net option'
             controlnet = controlnet[0]
-            controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to].copy()
+            controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to]
             controlnet_search_folders = list(args)
             controlnet_image_files = []
             for con_n, conet in enumerate(controlnet_args):
@@ -340,6 +340,7 @@ class Script(modules.scripts.Script):
                         cn_np_mask = copy.deepcopy(cn_np)
                         cn_np_mask[:,:,:3] = 0
                         conet.image = {'image':cn_np_image,'mask':cn_np_mask}
+            state.job = f'{n+1} image T2I Generate'
             processed = processing.process_images(p_txt)
             initial_info.append(processed.info)
             posi, nega = processed.all_prompts[0], processed.all_negative_prompts[0]
@@ -377,6 +378,8 @@ class Script(modules.scripts.Script):
                     p.init_images = [init_img]
                     if mask is not None:
                         p.image_mask = mask
+                        state.job_count += 1
+                        state.job = f'{detect_index + 1} DINO I2I Inpaint Generate'
                         processed = processing.process_images(p)
                         p.seed = processed.seed + 1
                         init_img = processed.images[0]
@@ -388,7 +391,6 @@ class Script(modules.scripts.Script):
                         images.save_image(init_img, p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                     output_images[n] = init_img
                     
-            state.job = f"Generation {n + 1} out of {state.job_count} DDetailer"
             if not disable_upscaler:
                 p2.init_images = [output_images[n]]
                 p2.prompt = initial_prompt[n]
