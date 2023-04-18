@@ -18,6 +18,12 @@ def try_convert(data, type, default, min, max):
         return convert
     except (ValueError, TypeError):
         return default
+    
+def prompt_spliter(prompt:str, split_token:str, count:int):
+    spliter = prompt.split(split_token)
+    while len(spliter) < count:
+        spliter.append('')
+    return spliter[:count]
 
 def combine_masks(mask, combine_masks_option, mask2):
     if combine_masks_option == 'AND': return cv2.bitwise_and(mask, mask2)
@@ -49,18 +55,12 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
         
     spliter = token_split.split(prompt)
     
-    def prompt_spliter(prompt:str):
-        spliter = prompt.split(':')
-        while len(spliter) < 4:
-            spliter.append('')
-        return spliter[:4]
-    
     while len(spliter) > 1:
         left, operator, right = spliter[:3]
         if not isinstance(left, np.ndarray):
             match = token_match.match(left)
             if match is None:
-                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(left)
+                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(left, ':', 4)
                 left = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
                                    try_convert(dilation.strip(), int, 4, 0, 128), 
@@ -71,7 +71,7 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
         if not isinstance(right, np.ndarray):
             match = token_match.match(right)
             if match is None:
-                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(right)
+                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(right, ':', 4)
                 right = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
                                    try_convert(dilation.strip(), int, 4, 0, 128), 
@@ -83,7 +83,7 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
         gc.collect()
         torch_gc()
     if isinstance(spliter[0], np.ndarray): return spliter[0]
-    dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(spliter[0])
+    dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(spliter[0], ':', 4)
     target = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
                                    try_convert(dilation.strip(), int, 4, 0, 128), 

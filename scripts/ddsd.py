@@ -10,7 +10,7 @@ from PIL import Image
 
 from scripts.sam import sam_model_list
 from scripts.dino import dino_model_list
-from scripts.ddsd_utils import dino_detect_from_prompt, try_convert
+from scripts.ddsd_utils import dino_detect_from_prompt, try_convert, prompt_spliter
 
 import modules
 from modules import processing, shared, images, devices, modelloader
@@ -370,10 +370,11 @@ class Script(modules.scripts.Script):
                 state.job = 'DINO Detect Pregress'
                 state.job_count += len(dino_detect_list)
                 for detect_index, detect in enumerate(dino_detect_list):
-                    detect = detect.split('$')
-                    detect[0] = detect[0].strip()
-                    p.denoising_strength = try_convert(detect[1], float, 0.4, 0, 1) if len(detect) > 1 else 0.4
-                    mask = dino_detect_from_prompt(detect[0], detailer_sam_model, detailer_dino_model, init_img)
+                    detect_prompt, detect_denoise, detect_cfg, detect_steps = prompt_spliter(detect, '$', 4)
+                    p.denoising_strength = try_convert(detect_denoise, float, 0.4, 0, 1)
+                    p.cfg_scale = try_convert(detect_cfg, float, p_txt.cfg_scale, 0, 300)
+                    p.steps = try_convert(detect_steps, int, p_txt.steps, 0, 150)
+                    mask = dino_detect_from_prompt(detect_prompt, detailer_sam_model, detailer_dino_model, init_img)
                     p.prompt = dino_detect_positive_list[detect_index] if dino_detect_positive_list[detect_index] else initial_prompt[-1]
                     p.negative_prompt = dino_detect_negative_list[detect_index] if dino_detect_negative_list[detect_index] else initial_negative[-1]
                     p.init_images = [init_img]
@@ -383,10 +384,12 @@ class Script(modules.scripts.Script):
                         p.seed = processed.seed + 1
                         init_img = processed.images[0]
                     else: state.job_count -= 1
-                    initial_info[n] += ', '.join(['',f'{detect_index+1} DINO : {detect[0]}', 
+                    initial_info[n] += ', '.join(['',f'{detect_index+1} DINO : {detect_prompt}', 
                                                    f'{detect_index+1} DINO Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
                                                    f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}',
-                                                   f'{detect_index+1} DINO Denoising : {p.denoising_strength}'])
+                                                   f'{detect_index+1} DINO Denoising : {p.denoising_strength}', 
+                                                   f'{detect_index+1} DINO CFG Scale : {p.cfg_scale}', 
+                                                   f'{detect_index+1} DINO Steps : {p.steps}'])
                     if shared.opts.data.get('save_ddsd_working_on_images', False):
                         images.save_image(init_img, p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                     output_images[n] = init_img

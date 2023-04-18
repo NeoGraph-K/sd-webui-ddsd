@@ -11,7 +11,10 @@ Inpainting with additional prompts after mask search with specific keywords. Add
 #### Detect Detailer How to use
 1. Input dino prompt
     1. Inpaint the dino prompt multiple times, separated by semicolons.
-    2. The denoise value can be adjusted with `$denoise` at the end of each dino prompt. defaults to 0.4.
+    2. Additional options can be controlled by writing $-separated content at the end of the dino prompt.
+        1. Written in order of Prompt, Denoise, CFG-Scale, Steps.
+        2. Each data value can be omitted except prompt.
+        3. Except for the prompt, the rest have default values. (Denoise - 0.4, CFG-Scale - Origin, Steps - Origin)
     3. Each dino prompt can be calculated with AND, OR, XOR, NOR, and NAND gates.
         1. face OR (body NAND outfit) -> Create a body mask that does not overlap with the outfit. And composited with a face mask.
         2. Use parentheses sparingly. Parentheses operations consume more VRAM because they generate masks in advance.
