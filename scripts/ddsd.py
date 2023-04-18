@@ -303,37 +303,35 @@ class Script(modules.scripts.Script):
                 controlnet_image_files.append(files.copy())
         
         t2i_scripts = p_txt.scripts.scripts.copy()
-        i2i_scripts = [x for x in t2i_scripts if os.path.basename(x.filename) in script_names_list]
+        i2i_scripts = [x for x in t2i_scripts if os.path.basename(x.filename) in script_names_list].copy()
         t2i_scripts_always = p_txt.scripts.alwayson_scripts.copy()
-        i2i_scripts_always = [x for x in t2i_scripts_always if os.path.basename(x.filename) in script_names_list]
+        i2i_scripts_always = [x for x in t2i_scripts_always if os.path.basename(x.filename) in script_names_list].copy()
         p.scripts = p_txt.scripts
         p.script_args = p_txt.script_args
         p2.scripts = p_txt.scripts
         p2.script_args = p_txt.script_args
         
-        p_txt.extra_generation_params["Tile upscale value"] = scalevalue
-        p_txt.extra_generation_params["Tile upscale width"] = rewidth
-        p_txt.extra_generation_params["Tile upscale height"] = reheight
-        p_txt.extra_generation_params["Tile upscale overlap"] = overlap
-        p_txt.extra_generation_params["Tile upscale upscaler"] = upscaler.name
-        
         print(f"DDetailer {p.width}x{p.height}.")
         
         output_images = []
         result_images = []
-        state.begin()
+        state.job = 'T2I Generate'
+        state.job_count = 0
         state.job_count += ddetail_count
         for n in range(ddetail_count):
             devices.torch_gc()
             start_seed = seed + n
+            cn_file_paths = []
             print(f"Processing initial image for output generation {n + 1} (T2I).")
             p_txt.seed = start_seed
             p_txt.scripts.scripts = t2i_scripts.copy()
             p_txt.scripts.alwayson_scripts = t2i_scripts_always.copy()
             if not disable_random_control_net:
                 for con_n, conet in enumerate(controlnet_args):
+                    cn_file_paths.append([])
                     if len(controlnet_image_files[con_n]) > 0:
-                        cn_image = Image.open(choice(controlnet_image_files[con_n]))
+                        cn_file_paths[con_n].append(choice(controlnet_image_files[con_n]))
+                        cn_image = Image.open(cn_file_paths[con_n][0])
                         cn_np = np.array(cn_image)
                         if cn_image.mode == 'RGB':
                             cn_np = np.concatenate([cn_np, 255*np.ones((cn_np.shape[0], cn_np.shape[1], 1), dtype=np.uint8)], axis=-1)
@@ -341,9 +339,9 @@ class Script(modules.scripts.Script):
                         cn_np_mask = copy.deepcopy(cn_np)
                         cn_np_mask[:,:,:3] = 0
                         conet.image = {'image':cn_np_image,'mask':cn_np_mask}
-            state.job = f'{n+1} image T2I Generate'
             processed = processing.process_images(p_txt)
             initial_info.append(processed.info)
+            initial_info[n] += ', ' + ', '.join([f'ControlNet {n} Random Image : {x}' for n, x in enumerate(cn_file_paths) if len(x) > 0])
             posi, nega = processed.all_prompts[0], processed.all_negative_prompts[0]
             
             initial_prompt.append(posi)
@@ -369,6 +367,8 @@ class Script(modules.scripts.Script):
                 dino_detect_negative_list = [x.strip() for x in dino_detect_negative_list]
                 
                 init_img = output_images[-1]
+                state.job = 'DINO Detect Pregress'
+                state.job_count += len(dino_detect_list)
                 for detect_index, detect in enumerate(dino_detect_list):
                     detect = detect.split('$')
                     detect[0] = detect[0].strip()
@@ -379,11 +379,10 @@ class Script(modules.scripts.Script):
                     p.init_images = [init_img]
                     if mask is not None:
                         p.image_mask = mask
-                        state.job_count += 1
-                        state.job = f'{detect_index + 1} DINO I2I Inpaint Generate'
                         processed = processing.process_images(p)
                         p.seed = processed.seed + 1
                         init_img = processed.images[0]
+                    else: state.job_count -= 1
                     initial_info[n] += ', '.join(['',f'{detect_index+1} DINO : {detect[0]}', 
                                                    f'{detect_index+1} DINO Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
                                                    f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}',
@@ -397,6 +396,14 @@ class Script(modules.scripts.Script):
                 p2.prompt = initial_prompt[n]
                 p2.negative_prompt = initial_negative[n]
                 
+                initial_info[n] += ', '.join(['',
+                    f'Tile upscale value : {scalevalue}',
+                    f'Tile upscale width : {rewidth}',
+                    f'Tile upscale height : {reheight}',
+                    f'Tile upscale overlap : {overlap}',
+                    f'Tile upscale upscaler : {upscaler.name}'
+                ])
+                
                 init_img = output_images[n]
 
                 if(upscaler.name != "None"): 
@@ -405,7 +412,6 @@ class Script(modules.scripts.Script):
                     img = init_img
 
                 devices.torch_gc()
-                state.job_count += 1
                 grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
 
                 batch_size = p2.batch_size
@@ -417,6 +423,7 @@ class Script(modules.scripts.Script):
                         work.append(tiledata[2])
 
                 batch_count = math.ceil(len(work) / batch_size)
+                state.job = 'Upscaler Batching'
                 state.job_count += batch_count
 
                 print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
