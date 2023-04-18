@@ -404,7 +404,7 @@ class Script(modules.scripts.Script):
                     img = init_img
 
                 devices.torch_gc()
-
+                state.job_count += 1
                 grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
 
                 batch_size = p2.batch_size
