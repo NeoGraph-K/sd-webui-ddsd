@@ -1,5 +1,6 @@
 import os
 import math
+import copy
 from random import choice
 from glob import glob
 
@@ -7,9 +8,9 @@ import gradio as gr
 import numpy as np
 from PIL import Image
 
-from scripts.sam import sam_predict, sam_model_list
+from scripts.sam import sam_model_list
 from scripts.dino import dino_model_list
-from scripts.ddsd_utils import combine_masks
+from scripts.ddsd_utils import dino_detect_from_prompt, try_convert
 
 import modules
 from modules import processing, shared, images, devices, modelloader
@@ -75,7 +76,7 @@ class Script(modules.scripts.Script):
         return "ddetailer + sdupscale"
 
     def show(self, is_img2img):
-        return not is_img2img
+        return True
 
     def ui(self, is_img2img):
         sample_list = [x.name for x in shared.list_samplers()]
@@ -84,8 +85,8 @@ class Script(modules.scripts.Script):
         ret = []
         
         with gr.Group():
-            control_net_info = gr.HTML('<br><p style="margin-bottom:0.75em">T2I Control Net random image process</p>')
-            disable_random_control_net = gr.Checkbox(label='Disable Random Controlnet', value=True, visible=True)
+            control_net_info = gr.HTML('<br><p style="margin-bottom:0.75em">T2I Control Net random image process</p>', visible=not is_img2img)
+            disable_random_control_net = gr.Checkbox(label='Disable Random Controlnet', value=True, visible=not is_img2img)
             cn_models_num = shared.opts.data.get("control_net_max_models_num", 1)
             image_detectors = []
             with gr.Column():
@@ -140,19 +141,13 @@ class Script(modules.scripts.Script):
                     detailer_sam_model = gr.Dropdown(label='Detailer SAM Model', elem_id='detailer_sam_model', choices=sam_model_list(), value=sam_model_list()[0], visible=True)
                     detailer_dino_model = gr.Dropdown(label='Deteiler DINO Model', elem_id='detailer_dino_model', choices=dino_model_list(), value=dino_model_list()[0], visible=True)
                 with gr.Column():
-                    dino_detection_prompt = gr.Textbox(label="Detect Prompt", elem_id="detailer_detect_prompt", show_label=True, lines=2, placeholder="Detect Token Prompt(ex - face;hand)", visible=True)
+                    dino_detection_prompt = gr.Textbox(label="Detect Prompt", elem_id="detailer_detect_prompt", show_label=True, lines=2, placeholder="Detect Token Prompt(ex - face:level(0-2):threshold(0-1):dilation(0-128)$denoise(0-1);hand)", visible=True)
                     dino_detection_positive = gr.Textbox(label="Positive Prompt", elem_id="detailer_detect_positive", show_label=True, lines=3, placeholder="Detect Mask Inpaint Positive(ex - pureeros;red hair)", visible=True)
                     dino_detection_negative = gr.Textbox(label="Negative Prompt", elem_id="detailer_detect_negative", show_label=True, lines=3, placeholder="Detect Mask Inpaint Negative(ex - easynagetive;nsfw)", visible=True)
-                    dino_detection_threshold = gr.Slider(label="Detect Threshold", elem_id='detailer_detect_threshold', show_label=True, minimum=0, maximum=1, step=0.01, value=0.3, visible=True)
                 with gr.Row():
                     dino_full_res_inpaint = gr.Checkbox(label='Inpaint at full resolution ', elem_id='detailer_full_res', value=True, visible = True)
-                    dino_bitwise_option = gr.Radio(label='Bitwise operation', elem_id='detailer_bitwise', choices=['AND', 'OR', 'OTHER'], value='OR', visible=True)
-                with gr.Row():
-                    dino_dilation = gr.Slider(label='Dilation factor', elem_id='detailer_dilation', minimum=0, maximum=128, step=1, value=4, visible=True)
                     dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=32, visible=True)
-                with gr.Row():
                     detailer_mask_blur = gr.Slider(label='Detailer Blur', elem_id='detailer_mask_blur', minimum=0, maximum=64, step=1, value=4)
-                    detailer_denoise = gr.Slider(label='Detailer Denoise', elem_id='detailer_denoise', minimum=0, maximum=1, step=0.01, value=0.4)
 
         disable_detailer.change(
             lambda disable:{
@@ -162,12 +157,8 @@ class Script(modules.scripts.Script):
                 dino_detection_prompt:gr_show(not disable),
                 dino_detection_positive:gr_show(not disable),
                 dino_detection_negative:gr_show(not disable),
-                dino_detection_threshold:gr_show(not disable),
                 dino_full_res_inpaint:gr_show(not disable),
-                dino_bitwise_option:gr_show(not disable),
-                dino_dilation:gr_show(not disable),
                 dino_inpaint_padding:gr_show(not disable),
-                detailer_denoise:gr_show(not disable),
                 detailer_mask_blur:gr_show(not disable)
             },
             inputs=[disable_detailer],
@@ -178,12 +169,8 @@ class Script(modules.scripts.Script):
                 dino_detection_prompt,
                 dino_detection_positive,
                 dino_detection_negative,
-                dino_detection_threshold,
                 dino_full_res_inpaint,
-                dino_bitwise_option,
-                dino_dilation,
                 dino_inpaint_padding,
-                detailer_denoise,
                 detailer_mask_blur
             ]
         )
@@ -191,7 +178,7 @@ class Script(modules.scripts.Script):
         ret += [enable_script_names]
         ret += [disable_random_control_net]
         ret += [disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
-        ret += [disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative, dino_detection_threshold, dino_full_res_inpaint, dino_bitwise_option, dino_dilation, dino_inpaint_padding, detailer_denoise, detailer_mask_blur]
+        ret += [disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative, dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur]
         ret += image_detectors
 
         return ret
@@ -200,8 +187,8 @@ class Script(modules.scripts.Script):
             enable_script_names,
             disable_random_control_net, 
             disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
-            disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative, dino_detection_threshold,
-            dino_full_res_inpaint, dino_bitwise_option, dino_dilation, dino_inpaint_padding, detailer_denoise, detailer_mask_blur,
+            disable_detailer, detailer_sample, detailer_sam_model, detailer_dino_model, dino_detection_prompt, dino_detection_positive, dino_detection_negative,
+            dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
             *args):
         processing.fix_seed(p)
         initial_info = []
@@ -221,7 +208,7 @@ class Script(modules.scripts.Script):
         p = StableDiffusionProcessingImg2Img(
                 init_images = None,
                 resize_mode = 0,
-                denoising_strength = detailer_denoise,
+                denoising_strength = 0,
                 mask = None,
                 mask_blur= detailer_mask_blur,
                 inpainting_fill = 1,
@@ -303,7 +290,7 @@ class Script(modules.scripts.Script):
             controlnet = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) in ['controlnet.py']]
             assert len(controlnet) > 0, 'Do not find controlnet, please install controlnet or disable random control net option'
             controlnet = controlnet[0]
-            controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to]
+            controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to].copy()
             controlnet_search_folders = list(args)
             controlnet_image_files = []
             for con_n, conet in enumerate(controlnet_args):
@@ -349,8 +336,8 @@ class Script(modules.scripts.Script):
                         cn_np = np.array(cn_image)
                         if cn_image.mode == 'RGB':
                             cn_np = np.concatenate([cn_np, 255*np.ones((cn_np.shape[0], cn_np.shape[1], 1), dtype=np.uint8)], axis=-1)
-                        cn_np_image = cn_np[:,:,:3].copy()
-                        cn_np_mask = cn_np
+                        cn_np_image = copy.deepcopy(cn_np[:,:,:3])
+                        cn_np_mask = copy.deepcopy(cn_np)
                         cn_np_mask[:,:,:3] = 0
                         conet.image = {'image':cn_np_image,'mask':cn_np_mask}
             processed = processing.process_images(p_txt)
@@ -361,8 +348,11 @@ class Script(modules.scripts.Script):
             initial_negative.append(nega)
             output_images.append(processed.images[0])
             
+            if shared.opts.data.get('save_ddsd_working_on_images', False):
+                images.save_image(output_images[n], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                
             if not disable_detailer:
-                assert dino_detection_prompt, 'Please Input DINO Detect Prompt'
+                assert dino_detection_prompt, 'Please Input DINO Detect Prompt(Enable Logic Gate(OR,AND,XOR,NOR,NAND))(A OR B AND (C XOR D) NOR E NAND F)'
                 p.scripts.scripts = i2i_scripts.copy()
                 p.scripts.alwayson_scripts = i2i_scripts_always.copy()
                 dino_detect_list = [x for x in dino_detection_prompt.split(';') if len(x) > 0]
@@ -378,24 +368,25 @@ class Script(modules.scripts.Script):
                 
                 init_img = output_images[-1]
                 for detect_index, detect in enumerate(dino_detect_list):
-                    masks = sam_predict(detailer_sam_model, detailer_dino_model, init_img, detect, dino_detection_threshold, dino_dilation)
+                    detect = detect.split('$')
+                    detect[0] = detect[0].strip()
+                    p.denoising_strength = try_convert(detect[1], float, 0.4, 0, 1) if len(detect) > 1 else 0.4
+                    mask = dino_detect_from_prompt(detect[0], detailer_sam_model, detailer_dino_model, init_img)
                     p.prompt = dino_detect_positive_list[detect_index] if dino_detect_positive_list[detect_index] else initial_prompt[-1]
                     p.negative_prompt = dino_detect_negative_list[detect_index] if dino_detect_negative_list[detect_index] else initial_negative[-1]
-                    if dino_bitwise_option == 'OTHER':
-                        for mask in masks:
-                            p.init_images = [init_img]
-                            p.image_mask = mask
-                            processed = processing.process_images(p)
-                            init_img = processed.images[0]
-                    else:
-                        p.init_images = [init_img]
-                        p.image_mask = combine_masks(masks, dino_bitwise_option)
+                    p.init_images = [init_img]
+                    if mask is not None:
+                        p.image_mask = mask
                         processed = processing.process_images(p)
+                        p.seed = processed.seed + 1
                         init_img = processed.images[0]
-                    initial_info[-1] += ', '.join(['',f'{detect_index+1} DINO : {detect}', 
+                    initial_info[n] += ', '.join(['',f'{detect_index+1} DINO : {detect[0]}', 
                                                    f'{detect_index+1} DINO Positive : {processed.all_prompts[0] if dino_detect_positive_list[detect_index] else "original"}', 
-                                                   f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}'])
-                    output_images[-1] = init_img
+                                                   f'{detect_index+1} DINO Negative : {processed.all_negative_prompts[0] if dino_detect_negative_list[detect_index] else "original"}',
+                                                   f'{detect_index+1} DINO Denoising : {p.denoising_strength}'])
+                    if shared.opts.data.get('save_ddsd_working_on_images', False):
+                        images.save_image(init_img, p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                    output_images[n] = init_img
                     
             state.job = f"Generation {n + 1} out of {state.job_count} DDetailer"
             if not disable_upscaler:
@@ -448,8 +439,20 @@ class Script(modules.scripts.Script):
                         tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
                         image_index += 1
                 output_images[n] = images.combine_grid(grid)
+                if shared.opts.data.get('save_ddsd_working_on_images', False):
+                    images.save_image(output_images[n], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
         p_txt.scripts.scripts = original_scripts.copy()
         p_txt.scripts.alwayson_scripts = original_scripts_always.copy()
         return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
+    
+
+
+
+def on_ui_settings():
+    section = ('ddsd_script', "DDSD")
+    shared.opts.add_option("save_ddsd_working_on_images", shared.OptionInfo(
+        False, "Save all images you are working on", gr.Checkbox, {"interactive": True}, section=section))
+
+modules.script_callbacks.on_ui_settings(on_ui_settings)

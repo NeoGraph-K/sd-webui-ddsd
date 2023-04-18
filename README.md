@@ -8,13 +8,28 @@ A script that searches for specific keywords, inpaints them, and then upscales t
 Upscaling an image by a specific factor. Utilizes a tiled approach to scale with less memory
 ### Detect Detailer
 Inpainting with additional prompts after mask search with specific keywords. Add counts separated by semicolons
-
+#### Detect Detailer How to use
+1. Input dino prompt
+    1. Inpaint the dino prompt multiple times, separated by semicolons.
+    2. The denoise value can be adjusted with `$denoise` at the end of each dino prompt. defaults to 0.4.
+    3. Each dino prompt can be calculated with AND, OR, XOR, NOR, and NAND gates.
+        1. face OR (body NAND outfit) -> Create a body mask that does not overlap with the outfit. And composited with a face mask.
+        2. Use parentheses sparingly. Parentheses operations consume more VRAM because they generate masks in advance.
+    4. Option values ​​of each dino prompt can be entered by separating them with colons.
+        1. face:0:0.4:4 OR outfit:2:0.5:8
+        2. Each option, in order, is prompt, detection level (0-2:default 1), box threshold (0-1:default 0.3), and dilation value (0-128:default 4).
+        3. You can omit it if you wish. Replace with default value if omitted.
+2. Input positive prompt
+    1. Inpaint the positive prompt multiple times, separated by semicolons.
+3. Input negative prompt
+    1. Inpaint the negative prompt multiple times, separated by semicolons.
+4. Generate!
 ## Installation
 1. Download [CUDA](https://developer.nvidia.com/cuda-toolkit-archive) and [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
     1. You need current CUDA and cuDNN version
     2. This is [CUDA 117](https://drive.google.com/file/d/1HRTOLTB44-pRcrwIw9lQak2OC2ohNle3/view?usp=share_link) and [cuDNN](https://drive.google.com/file/d/1QcgaxUra0WnCWrCLjsWp_QKw1PKcvqpj/view?usp=share_link)
 2. After installing CUDA, overwrite cuDNN in the folder where you installed CUDA
-3. Install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd/`
+3. Install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd`
 4. Start Sd web UI
 5. It takes some time to install sam model and dino model
 

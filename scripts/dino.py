@@ -1,6 +1,8 @@
 import os
 import gc
 import torch
+import copy
+import cv2
 from collections import OrderedDict
 
 from modules import shared

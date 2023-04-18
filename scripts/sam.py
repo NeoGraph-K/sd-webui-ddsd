@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 import gc
+import copy
 
 from modules import shared
 from modules.paths import models_path
@@ -42,13 +43,11 @@ def clear_cache():
 def dilate_mask(mask, dilation):
     x, y = np.meshgrid(np.arange(dilation), np.arange(dilation))
     center = dilation // 2
-    dilation_kernel = ((x - center) ** 2 + (y - center) ** 2).astype(np.uint8)
+    dilation_kernel = ((x - center) ** 2 + (y - center) ** 2 <= center ** 2).astype(np.uint8)
     
     dilated_bin_img = binary_dilation(mask, dilation_kernel)
     
-    dilated_mask = Image.fromarray(dilated_bin_img.astype(np.uint8) * 255)
-    
-    return dilated_mask
+    return dilated_bin_img.astype(np.uint8) * 255
 
 def init_sam_model(sam_model_name):
     print('Initializing SAM')
@@ -64,17 +63,14 @@ def init_sam_model(sam_model_name):
     else:
         Exception(f'{sam_model_name} not found, please download model to models/sam')
 
-def sam_predict(sam_model_name, dino_model_name, image, dino_text, dino_box_threshold, dilation):
+def sam_predict(sam_model_name, dino_model_name, image, image_np, image_np_rgb, dino_text, dino_box_threshold, dilation, sam_level):
     print('Start SAM Processing')
-    image_np = np.array(image)
-    image_np_rgb = image_np[:,:,:3]
     
     assert dino_text, 'Please input dino text'
     
     boxes = dino_predict_internal(image, dino_model_name, dino_text, dino_box_threshold)
     
-    # no search text bounding box
-    if boxes.shape[0] < 1: return []
+    if boxes.shape[0] < 1: return None
     
     sam = init_sam_model(sam_model_name)
     
@@ -96,4 +92,4 @@ def sam_predict(sam_model_name, dino_model_name, image, dino_text, dino_box_thre
     gc.collect()
     torch_gc()
     
-    return [dilate_mask(Image.fromarray(np.any(x, axis=0)),dilation) for x in masks]
+    return dilate_mask(Image.fromarray(np.any(masks[sam_level], axis=0)),dilation)
