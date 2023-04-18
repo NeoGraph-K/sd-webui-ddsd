@@ -321,6 +321,7 @@ class Script(modules.scripts.Script):
         
         output_images = []
         result_images = []
+        state.begin()
         state.job_count += ddetail_count
         for n in range(ddetail_count):
             devices.torch_gc()
@@ -445,6 +446,7 @@ class Script(modules.scripts.Script):
                     images.save_image(output_images[n], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+        state.end()
         p_txt.scripts.scripts = original_scripts.copy()
         p_txt.scripts.alwayson_scripts = original_scripts_always.copy()
         return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
