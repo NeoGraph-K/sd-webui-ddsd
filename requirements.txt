@@ -1,3 +1,4 @@
+pycocotools
 segment_anything
 groundingdino
 scipy
