@@ -95,6 +95,5 @@ def dino_predict_internal(input_image, dino_model_name, text_prompt, box_thresho
         boxes_filt[i] = boxes_filt[i] * torch.Tensor([W, H, W, H])
         boxes_filt[i][:2] -= boxes_filt[i][2:] / 2
         boxes_filt[i][2:] += boxes_filt[i][:2]
-    gc.collect()
-    torch_gc()
+    clear_dino_cache()
     return boxes_filt

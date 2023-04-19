@@ -77,7 +77,6 @@ def sam_predict(sam_model_name, dino_model_name, image, image_np, image_np_rgb, 
     print(f'Running SAM Inference {image_np_rgb.shape}')
     predictor = SamPredictor(sam)
     predictor.set_image(image_np_rgb)
-    
     transformed_boxes = predictor.transform.apply_boxes_torch(boxes, image_np.shape[:2])
     masks, _, _ = predictor.predict_torch(
         point_coords = None,
@@ -85,11 +84,11 @@ def sam_predict(sam_model_name, dino_model_name, image, image_np, image_np_rgb, 
         boxes = transformed_boxes.to(device),
         multimask_output = True
     )
+    
     masks = masks.permute(1,0,2,3).cpu().numpy()
     
     if shared.cmd_opts.lowvram:
         sam.to(cpu)
-    gc.collect()
-    torch_gc()
+    clear_sam_cache()
     
     return dilate_mask(Image.fromarray(np.any(masks[sam_level], axis=0)),dilation)

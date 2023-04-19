@@ -349,7 +349,7 @@ class Script(modules.scripts.Script):
             output_images.append(processed.images[0])
             
             if shared.opts.data.get('save_ddsd_working_on_images', False):
-                images.save_image(output_images[n], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                images.save_image(output_images[n], p.outpath_samples, "T2I Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                 
             if not disable_detailer:
                 assert dino_detection_prompt, 'Please Input DINO Detect Prompt(Enable Logic Gate(OR,AND,XOR,NOR,NAND))(A OR B AND (C XOR D) NOR E NAND F)'
@@ -380,6 +380,8 @@ class Script(modules.scripts.Script):
                     p.init_images = [init_img]
                     if mask is not None:
                         p.image_mask = mask
+                        if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                            images.save_image(mask, p.outpath_samples, "Mask", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                         processed = processing.process_images(p)
                         p.seed = processed.seed + 1
                         init_img = processed.images[0]
@@ -391,7 +393,7 @@ class Script(modules.scripts.Script):
                                                    f'DINO {detect_index+1} CFG Scale : {p.cfg_scale}', 
                                                    f'DINO {detect_index+1} Steps : {p.steps}'])
                     if shared.opts.data.get('save_ddsd_working_on_images', False):
-                        images.save_image(init_img, p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                        images.save_image(init_img, p.outpath_samples, "DINO Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                     output_images[n] = init_img
                     
             if not disable_upscaler:
@@ -453,7 +455,7 @@ class Script(modules.scripts.Script):
                         image_index += 1
                 output_images[n] = images.combine_grid(grid)
                 if shared.opts.data.get('save_ddsd_working_on_images', False):
-                    images.save_image(output_images[n], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                    images.save_image(output_images[n], p.outpath_samples, "Upscale Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
         state.end()
@@ -468,5 +470,7 @@ def on_ui_settings():
     section = ('ddsd_script', "DDSD")
     shared.opts.add_option("save_ddsd_working_on_images", shared.OptionInfo(
         False, "Save all images you are working on", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_working_on_dino_mask_images", shared.OptionInfo(
+        False, "Save dino mask images you are working on", gr.Checkbox, {"interactive": True}, section=section))
 
 modules.script_callbacks.on_ui_settings(on_ui_settings)
