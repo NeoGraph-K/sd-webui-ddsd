@@ -2,7 +2,7 @@ import os
 import numpy as np
 import torch
 import gc
-import copy
+import cv2
 
 from modules import shared
 from modules.paths import models_path
@@ -41,13 +41,8 @@ def clear_cache():
     clear_dino_cache()
 
 def dilate_mask(mask, dilation):
-    x, y = np.meshgrid(np.arange(dilation), np.arange(dilation))
-    center = dilation // 2
-    dilation_kernel = ((x - center) ** 2 + (y - center) ** 2 <= center ** 2).astype(np.uint8)
-    
-    dilated_bin_img = binary_dilation(mask, dilation_kernel)
-    
-    return dilated_bin_img.astype(np.uint8) * 255
+    dilation_kernel = np.ones((dilation, dilation), np.uint8)
+    return cv2.dilate(mask, dilation_kernel)
 
 def init_sam_model(sam_model_name):
     print('Initializing SAM')
@@ -91,4 +86,4 @@ def sam_predict(sam_model_name, dino_model_name, image, image_np, image_np_rgb, 
         sam.to(cpu)
     clear_sam_cache()
     
-    return dilate_mask(Image.fromarray(np.any(masks[sam_level], axis=0)),dilation)
+    return dilate_mask(np.any(masks[sam_level], axis=0).astype(np.uint8) * 255,dilation)
