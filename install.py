@@ -49,7 +49,7 @@ def install_groundingdino():
         not in [('1.13.1', '117'), ('2.0.0', '117'), ('2.0.0', '118')]
         or not python_version
     ):
-        launch.run_pip('install groundingdino', 'sd-webui-ddsd requirement: groundingdino')
+        launch.run_pip('install git+https://github.com/IDEA-Research/GroundingDINO', 'sd-webui-ddsd requirement: groundingdino')
         return
 
     system = 'win' if platform.system() == 'Windows' else 'linux'
