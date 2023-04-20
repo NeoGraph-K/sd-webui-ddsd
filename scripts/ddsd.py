@@ -344,7 +344,7 @@ class Script(modules.scripts.Script):
                     )
                     mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_img, not disable_mask_paint_mode and isinstance(p_txt, StableDiffusionProcessingImg2Img), inpaint_mask_mode, getattr(p_txt,'image_mask',None))
                     if mask is not None:
-                        if dino_detection_spliter_disable_list[detect_index]:
+                        if not dino_detection_spliter_disable_list[detect_index]:
                             mask = mask_spliter_and_remover(mask, dino_detection_spliter_remove_area_list[detect_index])
                             for mask_split in mask:
                                 p.init_images = [init_img]
