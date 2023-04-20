@@ -141,15 +141,15 @@ class Script(modules.scripts.Script):
                     with gr.Tabs(elem_id = 'dino_detct_arguments', visible=False) as dino_tabs_acc:
                         for index in range(shared.opts.data.get('dino_detect_count', 2)):
                             with gr.Tab(f'DINO {index + 1} Argument', elem_id=f'dino_{index + 1}_argument_tab'):
-                                dino_detection_prompt = gr.Textbox(label=f"Detect Prompt", elem_id=f"detailer_detect_prompt_{index + 1}", show_label=True, lines=2, placeholder="Detect Token Prompt(ex - face:level(0-2):threshold(0-1):dilation(0-128))", visible=True)
+                                dino_detection_prompt = gr.Textbox(label=f"Detect {index + 1} Prompt", elem_id=f"detailer_detect_prompt_{index + 1}", show_label=True, lines=2, placeholder="Detect Token Prompt(ex - face:level(0-2):threshold(0-1):dilation(0-128))", visible=True)
                                 with gr.Row():
-                                    dino_detection_positive = gr.Textbox(label=f"Positive Prompt", elem_id=f"detailer_detect_positive_{index + 1}", show_label=True, lines=2, placeholder="Detect Mask Inpaint Positive(ex - perfect anatomy)", visible=True)
-                                    dino_detection_negative = gr.Textbox(label=f"Negative Prompt", elem_id=f"detailer_detect_negative_{index + 1}", show_label=True, lines=2, placeholder="Detect Mask Inpaint Negative(ex - nsfw)", visible=True)
-                                dino_detection_denoise = gr.Slider(minimum=0, maximum=1.0, step=0.01, elem_id=f'dino_detect_{index+1}_denoising', label='DINO Denoising strength', value=0.4, visible=True)
-                                dino_detection_cfg = gr.Slider(minimum=0, maximum=500, step=0.5, elem_id=f'dino_detect_{index+1}_cfg_scale', label='DINO CFG Scale(0 to Origin)', value=0, visible=True)
-                                dino_detection_steps = gr.Slider(minimum=0, maximum=150, step=1, elem_id=f'dino_detect_{index+1}_steps', label='DINO Steps(0 to Origin)', value=0, visible=True)
-                                dino_detection_spliter_disable = gr.Checkbox(label='Disable DINO Detect Split Mask', value=True, visible=True)
-                                dino_detection_spliter_remove_area = gr.Slider(minimum=0, maximum=800, step=8, elem_id=f'dino_detect_{index+1}_remove_area', label='Remove Area', value=16, visible=True)
+                                    dino_detection_positive = gr.Textbox(label=f"Positive {index + 1} Prompt", elem_id=f"detailer_detect_positive_{index + 1}", show_label=True, lines=2, placeholder="Detect Mask Inpaint Positive(ex - perfect anatomy)", visible=True)
+                                    dino_detection_negative = gr.Textbox(label=f"Negative {index + 1} Prompt", elem_id=f"detailer_detect_negative_{index + 1}", show_label=True, lines=2, placeholder="Detect Mask Inpaint Negative(ex - nsfw)", visible=True)
+                                dino_detection_denoise = gr.Slider(minimum=0, maximum=1.0, step=0.01, elem_id=f'dino_detect_{index+1}_denoising', label=f'DINO {index + 1} Denoising strength', value=0.4, visible=True)
+                                dino_detection_cfg = gr.Slider(minimum=0, maximum=500, step=0.5, elem_id=f'dino_detect_{index+1}_cfg_scale', label=f'DINO  {index + 1} CFG Scale(0 to Origin)', value=0, visible=True)
+                                dino_detection_steps = gr.Slider(minimum=0, maximum=150, step=1, elem_id=f'dino_detect_{index+1}_steps', label=f'DINO {index + 1} Steps(0 to Origin)', value=0, visible=True)
+                                dino_detection_spliter_disable = gr.Checkbox(label=f'Disable DINO {index + 1} Detect Split Mask', value=True, visible=True)
+                                dino_detection_spliter_remove_area = gr.Slider(minimum=0, maximum=800, step=8, elem_id=f'dino_detect_{index+1}_remove_area', label=f'Remove {index + 1} Area', value=16, visible=True)
                                 dino_detection_prompt_list.append(dino_detection_prompt)
                                 dino_detection_positive_list.append(dino_detection_positive)
                                 dino_detection_negative_list.append(dino_detection_negative)
