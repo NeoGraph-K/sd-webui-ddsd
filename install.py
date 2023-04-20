@@ -73,14 +73,19 @@ req_file = os.path.join(current_dir, 'requirements.txt')
 with open(req_file) as file:
     for lib in file:
         lib = lib.strip()
+        lib = 'skimage' if lib == 'scikit-image' else lib
         if not launch.is_installed(lib):
-            lib_fin = lib
             if lib == 'pycocotools':
                 install_pycocotools()
             elif lib == 'groundingdino':
                 install_groundingdino()
+            elif lib == 'skimage':
+                launch.run_pip(
+                    f'install scikit-image',
+                    f'sd-webui-ddsd requirement: scikit-image'
+                )
             else:
                 launch.run_pip(
-                    f'install {lib_fin}',
-                    f'sd-webui-ddsd requirement: {lib_fin}'
+                    f'install {lib}',
+                    f'sd-webui-ddsd requirement: {lib}'
                 )
