@@ -2,3 +2,4 @@ pycocotools
 segment_anything
 groundingdino
 scipy
+scikit-image
