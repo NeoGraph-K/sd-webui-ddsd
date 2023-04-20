@@ -10,7 +10,7 @@ from PIL import Image
 
 from scripts.sam import sam_model_list
 from scripts.dino import dino_model_list
-from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create
+from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create, get_fonts_list, image_apply_watermark
 
 import modules
 from modules import processing, shared, images, devices, modelloader
@@ -76,6 +76,7 @@ class Script(modules.scripts.Script):
     def __init__(self):
         self.original_scripts = None
         self.original_scripts_always = None
+        _ ,self.font_path = get_fonts_list()
         
     def title(self):
         return "ddetailer + sdupscale"
@@ -87,6 +88,7 @@ class Script(modules.scripts.Script):
         sample_list = [x.name for x in shared.list_samplers()]
         sample_list = [x for x in sample_list if x not in ['PLMS','UniPC','DDIM']]
         sample_list.insert(0,"Original")
+        fonts_list, _ = get_fonts_list()
         ret = []
         image_detectors = []
         dino_detection_prompt_list = []
@@ -97,7 +99,21 @@ class Script(modules.scripts.Script):
         dino_detection_steps_list = []
         dino_detection_spliter_disable_list = []
         dino_detection_spliter_remove_area_list = []
+        watermark_type_list = []
+        watermark_position_list = []
+        watermark_image_gr_list = []
+        watermark_text_gr_list = []
+        watermark_image_list = []
+        watermark_image_size_width_list = []
+        watermark_image_size_height_list = []
+        watermark_text_list = []
+        watermark_text_color_list = []
+        watermark_text_font_list = []
+        watermark_text_size_list = []
+        watermark_padding_list = []
+        watermark_alpha_list = []
         dino_tabs = None
+        watermark_tabs = None
         
         with gr.Group():
             with gr.Accordion("Random Controlnet", open = False, elem_id="ddsd_random_controlnet_acc"):
@@ -163,7 +179,57 @@ class Script(modules.scripts.Script):
                     with gr.Row():
                         dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=32, visible=False)
                         detailer_mask_blur = gr.Slider(label='Detailer Blur', elem_id='detailer_mask_blur', minimum=0, maximum=64, step=1, value=4, visible=False)
-        
+                        
+            with gr.Accordion("Watermark", open=False, elem_id='ddsd_watermark_option'):
+                with gr.Column():
+                    watermark_info = gr.HTML('<br><p style="margin-bottom:0.75em">Add a watermark to the final saved image</p>')
+                    disable_watermark = gr.Checkbox(label='Disable Watermark', elem_id='disable_watermark',value=True, visible=True)
+                    with gr.Tabs(elem_id='watermark_tabs', visible=False) as watermark_tabs_acc:
+                        for index in range(shared.opts.data.get('watermark_count', 1)):
+                            with gr.Tab(f'Watermark {index + 1} Argument', elem_id=f'watermark_{index+1}_argument_tab'):
+                                watermark_type = gr.Radio(choices=['Text','Image'], value='Text', label=f'Watermark {index+1} text')
+                                watermark_position = gr.Dropdown(choices=['Left','Left-Top','Top','Right-Top','Right','Right-Bottom','Bottom','Left-Bottom','Center'], value='Center', label=f'Watermark {index+1} Position', elem_id=f'watermark_{index+1}_position')
+                                with gr.Column(visible=False) as watermark_image_gr:
+                                    watermark_image = gr.Image(label=f"Watermark {index+1} Upload image", visible=True)
+                                    with gr.Row():
+                                        watermark_image_size_width = gr.Slider(label=f'Watermark {index+1} Width', visible=True, minimum=50, maximum=500, step=10, value=100)
+                                        watermark_image_size_height = gr.Slider(label=f'Watermark {index+1} Height', visible=True, minimum=50, maximum=500, step=10, value=100)    
+                                    watermark_image_gr_list.append(watermark_image_gr)
+                                with gr.Column(visible=True) as watermark_text_gr:
+                                    watermark_text = gr.Textbox(placeholder='watermark text - ex) Copyright © NeoGraph. All Rights Reserved.', visible=True, value='')
+                                    with gr.Row():
+                                        watermark_text_color = gr.ColorPicker(label=f'Watermark {index+1} Color')
+                                        watermark_text_font = gr.Dropdown(label=f'Watermark {index+1} Fonts', choices=fonts_list, value=fonts_list[0])
+                                        watermark_text_size = gr.Slider(label=f'Watermark {index+1} Size', visible=True, minimum=10, maximum=500, step=1, value=50)
+                                    watermark_text_gr_list.append(watermark_text_gr)
+                                watermark_padding = gr.Slider(label=f'Watermark {index+1} Padding', visible=True, minimum=0, maximum=200, step=1, value=10)
+                                watermark_alpha = gr.Slider(label=f'Watermark {index+1} Alpha', visible=True, minimum=0, maximum=1, step=0.01, value=0.4)
+                            watermark_type_list.append(watermark_type)
+                            watermark_position_list.append(watermark_position)
+                            watermark_image_list.append(watermark_image)
+                            watermark_image_size_width_list.append(watermark_image_size_width)
+                            watermark_image_size_height_list.append(watermark_image_size_height)
+                            watermark_text_list.append(watermark_text)
+                            watermark_text_color_list.append(watermark_text_color)
+                            watermark_text_font_list.append(watermark_text_font)
+                            watermark_text_size_list.append(watermark_text_size)
+                            watermark_padding_list.append(watermark_padding)
+                            watermark_alpha_list.append(watermark_alpha)
+                            
+                        watermark_tabs = watermark_tabs_acc
+        for index, watermark_type_data in enumerate(watermark_type_list):
+            watermark_type_data.change(
+                lambda type_data:dict(zip(watermark_image_gr_list+watermark_text_gr_list, [gr_show(type_data=='Image')]*len(watermark_image_gr_list)+[gr_show(type_data=='Text')]*len(watermark_text_gr_list))),
+                inputs=[watermark_type_data],
+                outputs=watermark_image_gr_list+watermark_text_gr_list
+            )
+        disable_watermark.change(
+            lambda disable:{
+                watermark_tabs:gr_show(not disable)
+            },
+            inputs=[disable_watermark],
+            outputs=watermark_tabs
+        )
         disable_random_control_net.change(
             lambda disable:dict(zip(image_detectors,[gr_show(not disable)]*cn_models_num)),
             inputs=[disable_random_control_net],
@@ -218,16 +284,35 @@ class Script(modules.scripts.Script):
         )
         
         ret += [enable_script_names]
-        ret += [disable_random_control_net]
+        ret += [disable_random_control_net, disable_watermark]
         ret += [disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
         ret += [disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model, dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur]
-        ret += dino_detection_prompt_list + dino_detection_positive_list + dino_detection_negative_list + dino_detection_denoise_list + dino_detection_cfg_list + dino_detection_steps_list + dino_detection_spliter_disable_list + dino_detection_spliter_remove_area_list + image_detectors
+        ret += dino_detection_prompt_list + \
+                dino_detection_positive_list + \
+                dino_detection_negative_list + \
+                dino_detection_denoise_list + \
+                dino_detection_cfg_list + \
+                dino_detection_steps_list + \
+                dino_detection_spliter_disable_list + \
+                dino_detection_spliter_remove_area_list + \
+                watermark_type_list + \
+                watermark_position_list + \
+                watermark_image_list + \
+                watermark_image_size_width_list + \
+                watermark_image_size_height_list + \
+                watermark_text_list + \
+                watermark_text_color_list + \
+                watermark_text_font_list + \
+                watermark_text_size_list + \
+                watermark_padding_list + \
+                watermark_alpha_list + \
+                image_detectors
 
         return ret
 
     def run(self, p, 
             enable_script_names,
-            disable_random_control_net, 
+            disable_random_control_net, disable_watermark,
             disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
             disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
@@ -242,7 +327,19 @@ class Script(modules.scripts.Script):
         dino_detection_steps_list = args_list[dino_detect_count * 5:dino_detect_count * 6]
         dino_detection_spliter_disable_list = args_list[dino_detect_count * 6:dino_detect_count * 7]
         dino_detection_spliter_remove_area_list = args_list[dino_detect_count * 7:dino_detect_count * 8]
-        random_controlnet_list = args_list[dino_detect_count * 8:]
+        watermark_count = shared.opts.data.get('watermark_count', 1)
+        watermark_type_list = args_list[dino_detect_count * 8 + watermark_count * 0:dino_detect_count * 8 + watermark_count * 1]
+        watermark_position_list = args_list[dino_detect_count * 8 + watermark_count * 1:dino_detect_count * 8 + watermark_count * 2]
+        watermark_image_list = args_list[dino_detect_count * 8 + watermark_count * 2:dino_detect_count * 8 + watermark_count * 3]
+        watermark_image_size_width_list = args_list[dino_detect_count * 8 + watermark_count * 3:dino_detect_count * 8 + watermark_count * 4]
+        watermark_image_size_height_list = args_list[dino_detect_count * 8 + watermark_count * 4:dino_detect_count * 8 + watermark_count * 5]
+        watermark_text_list = args_list[dino_detect_count * 8 + watermark_count * 5:dino_detect_count * 8 + watermark_count * 6]
+        watermark_text_color_list = args_list[dino_detect_count * 8 + watermark_count * 6:dino_detect_count * 8 + watermark_count * 7]
+        watermark_text_font_list = args_list[dino_detect_count * 8 + watermark_count * 7:dino_detect_count * 8 + watermark_count * 8]
+        watermark_text_size_list = args_list[dino_detect_count * 8 + watermark_count * 8:dino_detect_count * 8 + watermark_count * 9]
+        watermark_padding_list = args_list[dino_detect_count * 8 + watermark_count * 9:dino_detect_count * 8 + watermark_count * 10]
+        watermark_alpha_list = args_list[dino_detect_count * 8 + watermark_count * 10:dino_detect_count * 8 + watermark_count * 11]
+        random_controlnet_list = args_list[dino_detect_count * 8 + watermark_count * 11:]
         
         processing.fix_seed(p)
         initial_info = []
@@ -439,6 +536,24 @@ class Script(modules.scripts.Script):
                 output_images[n] = images.combine_grid(grid)
                 if shared.opts.data.get('save_ddsd_working_on_images', False):
                     images.save_image(output_images[n], p.outpath_samples, "Upscale Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                    
+            if not disable_watermark:
+                if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
+                    result_images.append(output_images[n])
+                    images.save_image(result_images[-1], p.outpath_samples, "Without_Watermark", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
+                for n in range(watermark_count):
+                    output_images[n] = image_apply_watermark(output_images[n], 
+                                                             watermark_type_list[n],
+                                                             watermark_position_list[n],
+                                                             watermark_image_list[n],
+                                                             watermark_image_size_width_list[n],
+                                                             watermark_image_size_height_list[n],
+                                                             watermark_text_list[n],
+                                                             watermark_text_color_list[n],
+                                                             self.font_path[watermark_text_font_list[n]],
+                                                             watermark_text_size_list[n],
+                                                             watermark_padding_list[n],
+                                                             watermark_alpha_list[n])
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
         state.end()
@@ -457,5 +572,9 @@ def on_ui_settings():
         False, "Save dino mask images you are working on", gr.Checkbox, {"interactive": True}, section=section))
     shared.opts.add_option("dino_detect_count", shared.OptionInfo(
         2, "Dino Detect Max Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
+    shared.opts.add_option("save_ddsd_watermark_with_and_without", shared.OptionInfo(
+        False, "Save with and without watermark ", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("watermark_count", shared.OptionInfo(
+        1, "Watermark Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
 
 modules.script_callbacks.on_ui_settings(on_ui_settings)

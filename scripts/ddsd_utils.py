@@ -2,6 +2,8 @@ import re
 import numpy as np
 import cv2
 import gc
+import matplotlib.font_manager
+from PIL import Image, ImageDraw, ImageFont
 from scripts.sam import sam_predict
 from modules.devices import torch_gc
 from skimage import measure
@@ -166,3 +168,51 @@ def I2I_Generator_Create(p, i2i_sample, i2i_mask_blur, full_res_inpainting, inpa
     i2i.negative_prompt = negative
     
     return i2i
+
+def get_fonts_list():
+    return [matplotlib.font_manager.FontProperties(fname=x).get_name() for x in matplotlib.font_manager.findSystemFonts()], {matplotlib.font_manager.FontProperties(fname=x).get_name():x for x in matplotlib.font_manager.findSystemFonts()}
+
+def image_apply_watermark(image, watermark_type, watermark_position, watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size, watermark_padding, watermark_alpha):
+    gc.collect()
+    torch_gc()
+    if watermark_type == 'Text':
+        font = ImageFont.truetype(watermark_text_font, watermark_text_size)
+        copy_image = image.copy()
+        draw = ImageDraw.Draw(copy_image)
+        text_width, text_height = font.getsize(watermark_text)
+        left, right, top, bottom = 0 + watermark_padding, image.size[0] - watermark_padding, 0 + watermark_padding, image.size[1] - watermark_padding
+        if watermark_position == 'Left': position = (left, (top + bottom) // 2 - text_height // 2)
+        elif watermark_position == 'Left-Top': position = (left, top)
+        elif watermark_position == 'Top': position = ((left + right) // 2 - text_width // 2, top)
+        elif watermark_position == 'Right-Top': position = (right - text_width,top)
+        elif watermark_position == 'Right': position = (right - text_width, (top + bottom) // 2 - text_height // 2)
+        elif watermark_position == 'Right-Bottom': position = (right - text_width, bottom - text_height)
+        elif watermark_position == 'Bottom': position = ((left + right) // 2 - text_width // 2,bottom - text_height)
+        elif watermark_position == 'Left-Bottom': position = (left, bottom - text_height)
+        elif watermark_position == 'Center': position = ((left + right) // 2 - text_width // 2, (top + bottom) // 2 - text_height // 2)
+        draw.text(position, watermark_text, font=font, fill=tuple(int(watermark_text_color[x:x+2], 16) for x in (1,3,5)))
+        result = Image.blend(image, copy_image, watermark_alpha)
+    elif watermark_type == 'Image':
+        left, right, top, bottom = 0 + watermark_padding, image.size[0] - watermark_padding, 0 + watermark_padding, image.size[1] - watermark_padding
+        if watermark_position == 'Left': position = (left, (top + bottom) // 2 - watermark_image_size_height // 2)
+        elif watermark_position == 'Left-Top': position = (left, top)
+        elif watermark_position == 'Top': position = ((left + right) // 2 - watermark_image_size_width // 2, top)
+        elif watermark_position == 'Right-Top': position = (right - watermark_image_size_width,top)
+        elif watermark_position == 'Right': position = (right - watermark_image_size_width, (top + bottom) // 2 - watermark_image_size_height // 2)
+        elif watermark_position == 'Right-Bottom': position = (right - watermark_image_size_width, bottom - watermark_image_size_height)
+        elif watermark_position == 'Bottom': position = ((left + right) // 2 - watermark_image_size_width // 2,bottom - watermark_image_size_height)
+        elif watermark_position == 'Left-Bottom': position = (left, bottom - watermark_image_size_height)
+        elif watermark_position == 'Center': position = ((left + right) // 2 - watermark_image_size_width // 2, (top + bottom) // 2 - watermark_image_size_height // 2)
+        copy_np = np.array(image)
+        copy_np_origin = copy_np.copy()
+        water_image = cv2.resize(watermark_image.copy(), (watermark_image_size_width, watermark_image_size_height))
+        mask = np.where(np.all(water_image == [255, 255, 255], axis=-1), 0, 255)
+        alpha = np.zeros((water_image.shape[0], water_image.shape[1]), dtype=np.uint8)
+        alpha[:,:] = mask
+        copy_np_crop = copy_np[position[1]:position[1]+watermark_image_size_height, position[0]:position[0]+watermark_image_size_width, :]
+        copy_np_crop[alpha.nonzero()] = water_image[alpha.nonzero()]
+        copy_np[position[1]:position[1]+watermark_image_size_height, position[0]:position[0]+watermark_image_size_width, :] = copy_np_crop
+        result = Image.fromarray(cv2.addWeighted(copy_np_origin, 1 - watermark_alpha, copy_np, watermark_alpha, 0))
+    gc.collect()
+    torch_gc()
+    return result
