@@ -2,8 +2,6 @@
 A script that searches for specific keywords, inpaints them, and then upscales them
 
 ## What is
-### Controlnet Random
-[Controlnet](https://github.com/Mikubill/sd-webui-controlnet) random sample image. usage glob
 ### Upscale
 Upscaling an image by a specific factor. Utilizes a tiled approach to scale with less memory
 ### Detect Detailer
@@ -34,10 +32,11 @@ Inpainting with additional prompts after mask search with specific keywords. Add
 1. Download [CUDA](https://developer.nvidia.com/cuda-toolkit-archive) and [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
     1. You need current CUDA and cuDNN version
     2. This is [CUDA 117](https://drive.google.com/file/d/1HRTOLTB44-pRcrwIw9lQak2OC2ohNle3/view?usp=share_link) and [cuDNN](https://drive.google.com/file/d/1QcgaxUra0WnCWrCLjsWp_QKw1PKcvqpj/view?usp=share_link)
-2. After installing CUDA, overwrite cuDNN in the folder where you installed CUDA
-3. Install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd`
-4. Start Sd web UI
-5. It takes some time to install sam model and dino model
+    3. After installing CUDA, overwrite cuDNN in the folder where you installed CUDA
+    4. Easy install support version. (torch == 1.13.1+cu117, torch==2.0.0+cu117 , torch==2.0.0+cu118)
+2. Install from the extensions tab with url `https://github.com/NeoGraph-K/sd-webui-ddsd`
+3. Start Sd web UI
+4. It takes some time to install sam model and dino model
 
 ## Credits
 
