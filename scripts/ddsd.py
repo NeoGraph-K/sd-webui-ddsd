@@ -539,7 +539,6 @@ class Script(modules.scripts.Script):
                     
             if not disable_watermark:
                 if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
-                    result_images.append(output_images[n])
                     images.save_image(output_images[n], p.outpath_samples, "Without_Watermark", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
                 for water_index in range(watermark_count):
                     output_images[n] = image_apply_watermark(output_images[water_index], 
