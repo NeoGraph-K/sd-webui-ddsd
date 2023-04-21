@@ -541,19 +541,19 @@ class Script(modules.scripts.Script):
                 if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
                     result_images.append(output_images[n])
                     images.save_image(result_images[-1], p.outpath_samples, "Without_Watermark", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                for n in range(watermark_count):
-                    output_images[n] = image_apply_watermark(output_images[n], 
-                                                             watermark_type_list[n],
-                                                             watermark_position_list[n],
-                                                             watermark_image_list[n],
-                                                             watermark_image_size_width_list[n],
-                                                             watermark_image_size_height_list[n],
-                                                             watermark_text_list[n],
-                                                             watermark_text_color_list[n],
-                                                             self.font_path[watermark_text_font_list[n]],
-                                                             watermark_text_size_list[n],
-                                                             watermark_padding_list[n],
-                                                             watermark_alpha_list[n])
+                for water_index in range(watermark_count):
+                    output_images[n] = image_apply_watermark(output_images[water_index], 
+                                                             watermark_type_list[water_index],
+                                                             watermark_position_list[water_index],
+                                                             watermark_image_list[water_index],
+                                                             watermark_image_size_width_list[water_index],
+                                                             watermark_image_size_height_list[water_index],
+                                                             watermark_text_list[water_index],
+                                                             watermark_text_color_list[water_index],
+                                                             self.font_path[watermark_text_font_list[water_index]],
+                                                             watermark_text_size_list[water_index],
+                                                             watermark_padding_list[water_index],
+                                                             watermark_alpha_list[water_index])
             result_images.append(output_images[n])
             images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
         state.end()
