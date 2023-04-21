@@ -335,7 +335,7 @@ class Script(modules.scripts.Script):
                         state.job_count += 1
                         processed = processing.process_images(pi)
                         init_image = processed.images[0]
-                        if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                        if shared.opts.data.get('save_ddsd_working_on_images', False):
                             images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                 else:
                     pi.seed = self.target_seeds + detect_index
@@ -346,7 +346,7 @@ class Script(modules.scripts.Script):
                     state.job_count += 1
                     processed = processing.process_images(pi)
                     init_image = processed.images[0]
-                    if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                    if shared.opts.data.get('save_ddsd_working_on_images', False):
                         images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                 p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "original"
