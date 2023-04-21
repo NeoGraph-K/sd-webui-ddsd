@@ -14,10 +14,11 @@ from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover
 
 import modules
 from modules import processing, shared, images, devices, modelloader
-from modules.processing import Processed, StableDiffusionProcessingImg2Img
+from modules.processing import StableDiffusionProcessingImg2Img, create_infotext
 from modules.shared import opts, state
 from modules.sd_models import model_hash
 from modules.paths import models_path
+from modules.scripts import AlwaysVisible
 
 from basicsr.utils.download_util import load_file_from_url
 
@@ -82,7 +83,7 @@ class Script(modules.scripts.Script):
         return "ddetailer + sdupscale"
 
     def show(self, is_img2img):
-        return True
+        return AlwaysVisible
 
     def ui(self, is_img2img):
         sample_list = [x.name for x in shared.list_samplers()]
@@ -90,7 +91,6 @@ class Script(modules.scripts.Script):
         sample_list.insert(0,"Original")
         fonts_list, _ = get_fonts_list()
         ret = []
-        image_detectors = []
         dino_detection_prompt_list = []
         dino_detection_positive_list = []
         dino_detection_negative_list = []
@@ -115,15 +115,7 @@ class Script(modules.scripts.Script):
         dino_tabs = None
         watermark_tabs = None
         
-        with gr.Group():
-            with gr.Accordion("Random Controlnet", open = False, elem_id="ddsd_random_controlnet_acc"):
-                with gr.Column():
-                    control_net_info = gr.HTML('<br><p style="margin-bottom:0.75em">T2I Control Net random image process</p>', visible=not is_img2img)
-                    disable_random_control_net = gr.Checkbox(label='Disable Random Controlnet', value=True, visible=not is_img2img)
-                    cn_models_num = shared.opts.data.get("control_net_max_models_num", 1)
-                    for n in range(cn_models_num):
-                        cn_image_detect_folder = gr.Textbox(label=f"{n} Control Model Image Random Folder(Using glob)", elem_id=f"{n}_cn_image_detector", value='',show_label=True, lines=1, placeholder="search glob image folder and file extension. ex ) - ./base/**/*.png", visible=False)
-                        image_detectors.append(cn_image_detect_folder)
+        with gr.Accordion('DDSD', open=False, elem_id='ddsd_all_option_acc'):
         
             with gr.Accordion("Script Option", open = False, elem_id="ddsd_enable_script_acc"):
                 with gr.Column():
@@ -134,6 +126,7 @@ class Script(modules.scripts.Script):
                 with gr.Column():
                     sd_upscale_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I Upscaler Option</p>')
                     disable_upscaler = gr.Checkbox(label='Disable Upscaler', elem_id='disable_upscaler', value=True, visible=True)
+                    ddetailer_before_upscaler = gr.Checkbox(label='Upscaler before running detailer', elem_id='upscaler_before_running_detailer', value=False, visible=False)
                     with gr.Row():
                         upscaler_sample = gr.Dropdown(label='Upscaler Sampling', elem_id='upscaler_sample', choices=sample_list, value=sample_list[0], visible=False, type="value")
                         upscaler_index = gr.Dropdown(label='Upscaler', elem_id='upscaler_index', choices=[x.name for x in shared.sd_upscalers], value=shared.sd_upscalers[-1].name, type="index", visible=False)
@@ -230,13 +223,9 @@ class Script(modules.scripts.Script):
             inputs=[disable_watermark],
             outputs=watermark_tabs
         )
-        disable_random_control_net.change(
-            lambda disable:dict(zip(image_detectors,[gr_show(not disable)]*cn_models_num)),
-            inputs=[disable_random_control_net],
-            outputs=image_detectors
-        )
         disable_upscaler.change(
             lambda disable: {
+                ddetailer_before_upscaler:gr_show(not disable),
                 upscaler_sample:gr_show(not disable),
                 upscaler_index:gr_show(not disable),
                 scalevalue:gr_show(not disable),
@@ -246,7 +235,7 @@ class Script(modules.scripts.Script):
                 denoising_strength:gr_show(not disable),
             },
             inputs= [disable_upscaler],
-            outputs =[upscaler_sample, upscaler_index, scalevalue, overlap, rewidth, reheight, denoising_strength]
+            outputs =[ddetailer_before_upscaler, upscaler_sample, upscaler_index, scalevalue, overlap, rewidth, reheight, denoising_strength]
         )
         
         disable_mask_paint_mode.change(
@@ -284,8 +273,8 @@ class Script(modules.scripts.Script):
         )
         
         ret += [enable_script_names]
-        ret += [disable_random_control_net, disable_watermark]
-        ret += [disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
+        ret += [disable_watermark]
+        ret += [disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength]
         ret += [disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model, dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur]
         ret += dino_detection_prompt_list + \
                 dino_detection_positive_list + \
@@ -305,263 +294,263 @@ class Script(modules.scripts.Script):
                 watermark_text_font_list + \
                 watermark_text_size_list + \
                 watermark_padding_list + \
-                watermark_alpha_list + \
-                image_detectors
+                watermark_alpha_list
 
         return ret
+    
+    def dino_detect_detailer(self, p, init_image,
+                             disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
+                             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
+                             dino_detect_count,
+                             dino_detection_prompt_list,
+                             dino_detection_positive_list,
+                             dino_detection_negative_list,
+                             dino_detection_denoise_list,
+                             dino_detection_cfg_list,
+                             dino_detection_steps_list,
+                             dino_detection_spliter_disable_list,
+                             dino_detection_spliter_remove_area_list):
+        for detect_index in range(dino_detect_count):
+            if len(dino_detection_prompt_list[detect_index]) < 1: continue
+            pi = I2I_Generator_Create(
+                p, ('Euler' if p.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p.sampler_name) if detailer_sample == 'Original' else detailer_sample,
+                detailer_mask_blur, dino_full_res_inpaint, dino_inpaint_padding, init_image,
+                dino_detection_denoise_list[detect_index],
+                dino_detection_cfg_list[detect_index] if dino_detection_cfg_list[detect_index] > 0 else p.cfg_scale,
+                dino_detection_steps_list[detect_index] if dino_detection_steps_list[detect_index] > 0 else p.steps,
+                p.width, p.height, p.tiling, p.scripts, self.i2i_scripts, self.i2i_scripts_always, p.script_args,
+                dino_detection_positive_list[detect_index] if dino_detection_positive_list[detect_index] else self.target_prompts,
+                dino_detection_negative_list[detect_index] if dino_detection_negative_list[detect_index] else self.target_negative_prompts
+            )
+            mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_image, not disable_mask_paint_mode and isinstance(p, StableDiffusionProcessingImg2Img), inpaint_mask_mode, getattr(p,'image_mask',None))
+            if mask is not None:
+                if not dino_detection_spliter_disable_list[detect_index]:
+                    mask = mask_spliter_and_remover(mask, dino_detection_spliter_remove_area_list[detect_index])
+                    for mask_index, mask_split in enumerate(mask):
+                        pi.seed = self.target_seeds + mask_index + detect_index
+                        pi.init_images = [init_image]
+                        pi.image_mask = Image.fromarray(mask_split)
+                        if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                            images.save_image(pi.image_mask, p.outpath_samples, "Mask", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                        state.job_count += 1
+                        processed = processing.process_images(pi)
+                        init_image = processed.images[0]
+                        if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                            images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                else:
+                    pi.seed = self.target_seeds + detect_index
+                    pi.init_images = [init_image]
+                    pi.image_mask = Image.fromarray(mask)
+                    if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                        images.save_image(pi.image_mask, p.outpath_samples, "Mask", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                    state.job_count += 1
+                    processed = processing.process_images(pi)
+                    init_image = processed.images[0]
+                    if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
+                        images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "original"
+                p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = processed.all_negative_prompts[0] if dino_detection_negative_list[detect_index] else "original"
+                p.extra_generation_params[f'DINO {detect_index + 1} Denoising'] = pi.denoising_strength
+                p.extra_generation_params[f'DINO {detect_index + 1} CFG Scale'] = pi.cfg_scale
+                p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
+                p.extra_generation_params[f'DINO {detect_index + 1} Spliter'] = not dino_detection_spliter_disable_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
+            else:
+                p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = "Error"
+                p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = "Error"
+                p.extra_generation_params[f'DINO {detect_index + 1} Denoising'] = pi.denoising_strength
+                p.extra_generation_params[f'DINO {detect_index + 1} CFG Scale'] = pi.cfg_scale
+                p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
+                p.extra_generation_params[f'DINO {detect_index + 1} Spliter'] = not dino_detection_spliter_disable_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
+        return init_image
+    
+    def upscale(self, p, init_image, 
+                scalevalue, upscaler_sample, overlap, rewidth, reheight, denoising_strength, 
+                detailer_mask_blur, dino_full_res_inpaint, dino_inpaint_padding):
+        pi = I2I_Generator_Create(
+                p, ('Euler' if p.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p.sampler_name) if upscaler_sample == 'Original' else upscaler_sample,
+                detailer_mask_blur, dino_full_res_inpaint, dino_inpaint_padding, init_image,
+                denoising_strength, p.cfg_scale, p.steps,
+                rewidth, reheight, p.tiling, p.scripts, self.i2i_scripts, self.i2i_scripts_always, p.script_args,
+                self.target_prompts, self.target_negative_prompts
+            )
+        p.extra_generation_params[f'Tile upscale value'] = scalevalue
+        p.extra_generation_params[f'Tile upscale width'] = rewidth
+        p.extra_generation_params[f'Tile upscale height'] = reheight
+        p.extra_generation_params[f'Tile upscale overlap'] = overlap
+        p.extra_generation_params[f'Tile upscale upscaler'] = self.upscaler.name
+        if(self.upscaler.name != "None"): 
+            img = self.upscaler.scaler.upscale(init_image, scalevalue, self.upscaler.data_path)
+        else:
+            img = init_image
 
-    def run(self, p, 
+        devices.torch_gc()
+        grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
+        work = []
+        for y, h, row in grid.tiles:
+            for tiledata in row:
+                work.append(tiledata[2])
+
+        batch_count = math.ceil(len(work))
+        state.job = 'Upscaler Batching'
+        state.job_count += batch_count
+
+        print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
+        
+        pi.seed = self.target_seeds
+        work_results = []
+        for i in range(batch_count):
+            pi.init_images = work[i:(i+1)]
+            processed = processing.process_images(pi)
+
+            p.seed = processed.seed + 1
+            work_results += processed.images
+
+            image_index = 0
+            for y, h, row in grid.tiles:
+                for tiledata in row:
+                    tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
+                    image_index += 1
+        init_image = images.combine_grid(grid)
+        if shared.opts.data.get('save_ddsd_working_on_images', False):
+            images.save_image(init_image, p.outpath_samples, "Upscale Working", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+        return init_image
+    
+    def watermark(self, p, init_image):
+        if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
+            images.save_image(init_image, p.outpath_samples, "Without_Watermark", self.target_seeds, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+        for water_index in range(self.watermark_count):
+            init_image = image_apply_watermark(init_image, 
+                                                self.watermark_type_list[water_index],
+                                                self.watermark_position_list[water_index],
+                                                self.watermark_image_list[water_index],
+                                                self.watermark_image_size_width_list[water_index],
+                                                self.watermark_image_size_height_list[water_index],
+                                                self.watermark_text_list[water_index],
+                                                self.watermark_text_color_list[water_index],
+                                                self.font_path[self.watermark_text_font_list[water_index]],
+                                                self.watermark_text_size_list[water_index],
+                                                self.watermark_padding_list[water_index],
+                                                self.watermark_alpha_list[water_index])
+        return init_image
+    
+    def process(self, p,
             enable_script_names,
-            disable_random_control_net, disable_watermark,
-            disable_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
+            disable_watermark,
+            disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength,
             disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
             *args):
+        self.restore_script(p)
+        self.enable_script_names = enable_script_names
+        self.disable_watermark = disable_watermark
+        self.disable_upscaler = disable_upscaler
+        self.ddetailer_before_upscaler = ddetailer_before_upscaler
+        self.scalevalue = scalevalue
+        self.upscaler_sample = upscaler_sample
+        self.overlap = overlap
+        self.upscaler_index = upscaler_index
+        self.rewidth = rewidth
+        self.reheight = reheight
+        self.denoising_strength = denoising_strength
+        self.disable_detailer = disable_detailer
+        self.disable_mask_paint_mode = disable_mask_paint_mode
+        self.inpaint_mask_mode = inpaint_mask_mode
+        self.detailer_sample = detailer_sample
+        self.detailer_sam_model = detailer_sam_model
+        self.detailer_dino_model = detailer_dino_model
+        self.dino_full_res_inpaint = dino_full_res_inpaint
+        self.dino_inpaint_padding = dino_inpaint_padding
+        self.detailer_mask_blur = detailer_mask_blur
         args_list = [*args]
-        dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
-        dino_detection_prompt_list = args_list[dino_detect_count * 0:dino_detect_count * 1]
-        dino_detection_positive_list = args_list[dino_detect_count * 1:dino_detect_count * 2]
-        dino_detection_negative_list = args_list[dino_detect_count * 2:dino_detect_count * 3]
-        dino_detection_denoise_list = args_list[dino_detect_count * 3:dino_detect_count * 4]
-        dino_detection_cfg_list = args_list[dino_detect_count * 4:dino_detect_count * 5]
-        dino_detection_steps_list = args_list[dino_detect_count * 5:dino_detect_count * 6]
-        dino_detection_spliter_disable_list = args_list[dino_detect_count * 6:dino_detect_count * 7]
-        dino_detection_spliter_remove_area_list = args_list[dino_detect_count * 7:dino_detect_count * 8]
-        watermark_count = shared.opts.data.get('watermark_count', 1)
-        watermark_type_list = args_list[dino_detect_count * 8 + watermark_count * 0:dino_detect_count * 8 + watermark_count * 1]
-        watermark_position_list = args_list[dino_detect_count * 8 + watermark_count * 1:dino_detect_count * 8 + watermark_count * 2]
-        watermark_image_list = args_list[dino_detect_count * 8 + watermark_count * 2:dino_detect_count * 8 + watermark_count * 3]
-        watermark_image_size_width_list = args_list[dino_detect_count * 8 + watermark_count * 3:dino_detect_count * 8 + watermark_count * 4]
-        watermark_image_size_height_list = args_list[dino_detect_count * 8 + watermark_count * 4:dino_detect_count * 8 + watermark_count * 5]
-        watermark_text_list = args_list[dino_detect_count * 8 + watermark_count * 5:dino_detect_count * 8 + watermark_count * 6]
-        watermark_text_color_list = args_list[dino_detect_count * 8 + watermark_count * 6:dino_detect_count * 8 + watermark_count * 7]
-        watermark_text_font_list = args_list[dino_detect_count * 8 + watermark_count * 7:dino_detect_count * 8 + watermark_count * 8]
-        watermark_text_size_list = args_list[dino_detect_count * 8 + watermark_count * 8:dino_detect_count * 8 + watermark_count * 9]
-        watermark_padding_list = args_list[dino_detect_count * 8 + watermark_count * 9:dino_detect_count * 8 + watermark_count * 10]
-        watermark_alpha_list = args_list[dino_detect_count * 8 + watermark_count * 10:dino_detect_count * 8 + watermark_count * 11]
-        random_controlnet_list = args_list[dino_detect_count * 8 + watermark_count * 11:]
-        
-        processing.fix_seed(p)
-        initial_info = []
-        initial_prompt = []
-        initial_negative = []
-        p.batch_size = 1
-        ddetail_count = p.n_iter
-        p.n_iter = 1
-        p.do_not_save_grid = True
-        p.do_not_save_samples = True
-        p_txt = p
-        
-        upscaler = shared.sd_upscalers[upscaler_index]
-        script_names_list = [x.strip()+'.py' for x in enable_script_names.split(';') if len(x) > 1]
-        seed = p_txt.seed
-        
-        if self.original_scripts is None: self.original_scripts = p_txt.scripts.scripts.copy()
-        else: 
-            if len(p_txt.scripts.scripts) != len(self.original_scripts): p_txt.scripts.scripts = self.original_scripts.copy()
-        if self.original_scripts_always is None: self.original_scripts_always = p_txt.scripts.alwayson_scripts.copy()
-        else: 
-            if len(p_txt.scripts.alwayson_scripts) != len(self.original_scripts_always): p_txt.scripts.alwayson_scripts = self.original_scripts_always.copy()
-        p_txt.scripts.scripts = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) not in [__file__]]
-        if not disable_random_control_net:
-            controlnet = [x for x in p_txt.scripts.scripts if os.path.basename(x.filename) in ['controlnet.py']]
-            assert len(controlnet) > 0, 'Do not find controlnet, please install controlnet or disable random control net option'
-            controlnet = controlnet[0]
-            controlnet_args = p_txt.script_args[controlnet.args_from:controlnet.args_to]
-            controlnet_search_folders = random_controlnet_list.copy()
-            controlnet_image_files = []
-            for con_n, conet in enumerate(controlnet_args):
-                files = []
-                if conet.enabled:
-                    if '**' in controlnet_search_folders[con_n]:
-                        files = glob(controlnet_search_folders[con_n], recursive=True)
-                    else:
-                        files = glob(controlnet_search_folders[con_n])
-                controlnet_image_files.append(files.copy())
-        
-        t2i_scripts = p_txt.scripts.scripts.copy()
-        i2i_scripts = [x for x in t2i_scripts if os.path.basename(x.filename) in script_names_list].copy()
-        t2i_scripts_always = p_txt.scripts.alwayson_scripts.copy()
-        i2i_scripts_always = [x for x in t2i_scripts_always if os.path.basename(x.filename) in script_names_list].copy()
-        
-        print(f"DDetailer {p.width}x{p.height}.")
-        
-        output_images = []
-        result_images = []
-        state.job = 'T2I Generate'
-        state.job_count = 0
-        state.job_count += ddetail_count
-        for n in range(ddetail_count):
-            devices.torch_gc()
-            start_seed = seed + n
-            cn_file_paths = []
-            print(f"Processing initial image for output generation {n + 1} (Generate).")
-            p_txt.seed = start_seed
-            p_txt.scripts.scripts = t2i_scripts.copy()
-            p_txt.scripts.alwayson_scripts = t2i_scripts_always.copy()
-            if not disable_random_control_net:
-                for con_n, conet in enumerate(controlnet_args):
-                    cn_file_paths.append([])
-                    if len(controlnet_image_files[con_n]) > 0:
-                        cn_file_paths[con_n].append(choice(controlnet_image_files[con_n]))
-                        cn_image = Image.open(cn_file_paths[con_n][0])
-                        cn_np = np.array(cn_image)
-                        if cn_image.mode == 'RGB':
-                            cn_np = np.concatenate([cn_np, 255*np.ones((cn_np.shape[0], cn_np.shape[1], 1), dtype=np.uint8)], axis=-1)
-                        cn_np_image = copy.deepcopy(cn_np[:,:,:3])
-                        cn_np_mask = copy.deepcopy(cn_np)
-                        cn_np_mask[:,:,:3] = 0
-                        conet.image = {'image':cn_np_image,'mask':cn_np_mask}
-            processed = processing.process_images(p_txt)
-            initial_info.append(processed.info)
-            initial_info[n] += ', ' + ', '.join([f'ControlNet {n} Random Image : {x}' for n, x in enumerate(cn_file_paths) if len(x) > 0])
-            posi, nega = processed.all_prompts[0], processed.all_negative_prompts[0]
-            
-            initial_prompt.append(posi)
-            initial_negative.append(nega)
-            output_images.append(processed.images[0])
-            
-            if shared.opts.data.get('save_ddsd_working_on_images', False):
-                images.save_image(output_images[n], p.outpath_samples, "Generate Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                
-            if not disable_detailer:
-                init_img = output_images[-1]
-                state.job = 'DINO Detect Pregress'
-                for detect_index in range(dino_detect_count):
-                    if len(dino_detection_prompt_list[detect_index]) < 1: continue
-                    p = I2I_Generator_Create(
-                        p_txt, ('Euler' if p_txt.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p_txt.sampler_name) if detailer_sample == 'Original' else detailer_sample,
-                        detailer_mask_blur, dino_full_res_inpaint, dino_inpaint_padding, init_img,
-                        dino_detection_denoise_list[detect_index],
-                        dino_detection_cfg_list[detect_index] if dino_detection_cfg_list[detect_index] > 0 else p_txt.cfg_scale,
-                        dino_detection_steps_list[detect_index] if dino_detection_steps_list[detect_index] > 0 else p_txt.steps,
-                        p_txt.width, p_txt.height, p_txt.tiling, p_txt.scripts, i2i_scripts, i2i_scripts_always, p_txt.script_args,
-                        dino_detection_positive_list[detect_index] if dino_detection_positive_list[detect_index] else initial_prompt[-1],
-                        dino_detection_negative_list[detect_index] if dino_detection_negative_list[detect_index] else initial_negative[-1]
-                    )
-                    mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_img, not disable_mask_paint_mode and isinstance(p_txt, StableDiffusionProcessingImg2Img), inpaint_mask_mode, getattr(p_txt,'image_mask',None))
-                    if mask is not None:
-                        if not dino_detection_spliter_disable_list[detect_index]:
-                            mask = mask_spliter_and_remover(mask, dino_detection_spliter_remove_area_list[detect_index])
-                            for mask_split in mask:
-                                p.init_images = [init_img]
-                                p.image_mask = Image.fromarray(mask_split)
-                                if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                                    images.save_image(p.image_mask, p.outpath_samples, "Mask", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                                state.job_count += 1
-                                processed = processing.process_images(p)
-                                p.seed = processed.seed + 1
-                                init_img = processed.images[0]
-                        else:
-                            p.init_images = [init_img]
-                            p.image_mask = Image.fromarray(mask)
-                            if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                                images.save_image(p.image_mask, p.outpath_samples, "Mask", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                            state.job_count += 1
-                            processed = processing.process_images(p)
-                            p.seed = processed.seed + 1
-                            init_img = processed.images[0]
-                    initial_info[n] += ', '.join(['',f'DINO {detect_index+1} : {dino_detection_prompt_list[detect_index]}', 
-                                                   f'DINO {detect_index+1} Positive : {processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "original"}', 
-                                                   f'DINO {detect_index+1} Negative : {processed.all_negative_prompts[0] if dino_detection_negative_list[detect_index] else "original"}',
-                                                   f'DINO {detect_index+1} Denoising : {p.denoising_strength}',
-                                                   f'DINO {detect_index+1} CFG Scale : {p.cfg_scale}', 
-                                                   f'DINO {detect_index+1} Steps : {p.steps}',
-                                                   f'DINO {detect_index+1} Spliter : {"True" if dino_detection_spliter_disable_list[detect_index] else "False"}',
-                                                   f'DINO {detect_index+1} Split Remove Area : {dino_detection_spliter_remove_area_list[detect_index]}'])
-                    if shared.opts.data.get('save_ddsd_working_on_images', False):
-                        images.save_image(init_img, p.outpath_samples, "DINO Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                    output_images[n] = init_img
-                    
-            if not disable_upscaler:
-                
-                p = I2I_Generator_Create(
-                        p_txt, ('Euler' if p_txt.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p_txt.sampler_name) if upscaler_sample == 'Original' else upscaler_sample,
-                        detailer_mask_blur, dino_full_res_inpaint, dino_inpaint_padding, output_images[n],
-                        denoising_strength, p_txt.cfg_scale, p_txt.steps,
-                        rewidth, reheight, p_txt.tiling, p_txt.scripts, i2i_scripts, i2i_scripts_always, p_txt.script_args,
-                        initial_prompt[n], initial_negative[n]
-                    )
-                
-                initial_info[n] += ', '.join(['',
-                    f'Tile upscale value : {scalevalue}',
-                    f'Tile upscale width : {rewidth}',
-                    f'Tile upscale height : {reheight}',
-                    f'Tile upscale overlap : {overlap}',
-                    f'Tile upscale upscaler : {upscaler.name}'
-                ])
-                
-                init_img = output_images[n]
-
-                if(upscaler.name != "None"): 
-                    img = upscaler.scaler.upscale(init_img, scalevalue, upscaler.data_path)
-                else:
-                    img = init_img
-
-                devices.torch_gc()
-                grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
-
-                batch_size = p.batch_size
-
-                work = []
-
-                for y, h, row in grid.tiles:
-                    for tiledata in row:
-                        work.append(tiledata[2])
-
-                batch_count = math.ceil(len(work) / batch_size)
-                state.job = 'Upscaler Batching'
-                state.job_count += batch_count
-
-                print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
-
-                p.seed = start_seed
-                
-                work_results = []
-                for i in range(batch_count):
-                    p.batch_size = batch_size
-                    p.init_images = work[i*batch_size:(i+1)*batch_size]
-
-                    state.job = f"Batch {i + 1 + n * batch_count} out of {state.job_count}"
-                    processed = processing.process_images(p)
-
-                    p.seed = processed.seed + 1
-                    work_results += processed.images
-
-                image_index = 0
-                for y, h, row in grid.tiles:
-                    for tiledata in row:
-                        tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
-                        image_index += 1
-                output_images[n] = images.combine_grid(grid)
-                if shared.opts.data.get('save_ddsd_working_on_images', False):
-                    images.save_image(output_images[n], p.outpath_samples, "Upscale Working", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                    
-            if not disable_watermark:
-                if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
-                    images.save_image(output_images[n], p.outpath_samples, "Without_Watermark", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-                for water_index in range(watermark_count):
-                    output_images[n] = image_apply_watermark(output_images[water_index], 
-                                                             watermark_type_list[water_index],
-                                                             watermark_position_list[water_index],
-                                                             watermark_image_list[water_index],
-                                                             watermark_image_size_width_list[water_index],
-                                                             watermark_image_size_height_list[water_index],
-                                                             watermark_text_list[water_index],
-                                                             watermark_text_color_list[water_index],
-                                                             self.font_path[watermark_text_font_list[water_index]],
-                                                             watermark_text_size_list[water_index],
-                                                             watermark_padding_list[water_index],
-                                                             watermark_alpha_list[water_index])
-            result_images.append(output_images[n])
-            images.save_image(result_images[-1], p.outpath_samples, "", start_seed, initial_prompt[n], opts.samples_format, info=initial_info[n], p=p_txt)
-        state.end()
-        p_txt.scripts.scripts = self.original_scripts.copy()
-        p_txt.scripts.alwayson_scripts = self.original_scripts_always.copy()
-        return Processed(p_txt, result_images, start_seed, initial_info[0], all_prompts=initial_prompt, all_negative_prompts=initial_negative, infotexts=initial_info)
+        self.dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
+        self.dino_detection_prompt_list = args_list[self.dino_detect_count * 0:self.dino_detect_count * 1]
+        self.dino_detection_positive_list = args_list[self.dino_detect_count * 1:self.dino_detect_count * 2]
+        self.dino_detection_negative_list = args_list[self.dino_detect_count * 2:self.dino_detect_count * 3]
+        self.dino_detection_denoise_list = args_list[self.dino_detect_count * 3:self.dino_detect_count * 4]
+        self.dino_detection_cfg_list = args_list[self.dino_detect_count * 4:self.dino_detect_count * 5]
+        self.dino_detection_steps_list = args_list[self.dino_detect_count * 5:self.dino_detect_count * 6]
+        self.dino_detection_spliter_disable_list = args_list[self.dino_detect_count * 6:self.dino_detect_count * 7]
+        self.dino_detection_spliter_remove_area_list = args_list[self.dino_detect_count * 7:self.dino_detect_count * 8]
+        self.watermark_count = shared.opts.data.get('watermark_count', 1)
+        self.watermark_type_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 0:self.dino_detect_count * 8 + self.watermark_count * 1]
+        self.watermark_position_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 1:self.dino_detect_count * 8 + self.watermark_count * 2]
+        self.watermark_image_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 2:self.dino_detect_count * 8 + self.watermark_count * 3]
+        self.watermark_image_size_width_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 3:self.dino_detect_count * 8 + self.watermark_count * 4]
+        self.watermark_image_size_height_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 4:self.dino_detect_count * 8 + self.watermark_count * 5]
+        self.watermark_text_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 5:self.dino_detect_count * 8 + self.watermark_count * 6]
+        self.watermark_text_color_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 6:self.dino_detect_count * 8 + self.watermark_count * 7]
+        self.watermark_text_font_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 7:self.dino_detect_count * 8 + self.watermark_count * 8]
+        self.watermark_text_size_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 8:self.dino_detect_count * 8 + self.watermark_count * 9]
+        self.watermark_padding_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 9:self.dino_detect_count * 8 + self.watermark_count * 10]
+        self.watermark_alpha_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 10:self.dino_detect_count * 8 + self.watermark_count * 11]
+        self.script_names_list = [x.strip()+'.py' for x in enable_script_names.split(';') if len(x) > 1]
+        self.i2i_scripts = [x for x in self.original_scripts if os.path.basename(x.filename) in self.script_names_list].copy()
+        self.i2i_scripts_always = [x for x in self.original_scripts_always if os.path.basename(x.filename) in self.script_names_list].copy()
+        self.upscaler = shared.sd_upscalers[upscaler_index]
     
-
-
+    def before_process_batch(self, p, *args, **kargs):
+        self.iter_number = kargs['batch_number']
+        self.batch_number = 0
+    
+    def restore_script(self, p):
+        if self.original_scripts is None: self.original_scripts = p.scripts.scripts.copy()
+        else: 
+            if len(p.scripts.scripts) != len(self.original_scripts): p.scripts.scripts = self.original_scripts.copy()
+        if self.original_scripts_always is None: self.original_scripts_always = p.scripts.alwayson_scripts.copy()
+        else: 
+            if len(p.scripts.alwayson_scripts) != len(self.original_scripts_always): p.scripts.alwayson_scripts = self.original_scripts_always.copy()
+        p.scripts.scripts = self.original_scripts.copy()
+        p.scripts.alwayson_scripts = self.original_scripts_always.copy()
+    
+    def postprocess_image(self, p, pp, *args):
+        devices.torch_gc()
+        output_image = pp.image
+        self.target_prompts = p.all_prompts[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
+        self.target_negative_prompts = p.all_negative_prompts[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
+        self.target_seeds = p.all_seeds[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
+        if shared.opts.data.get('save_ddsd_working_on_images', False):
+            images.save_image(output_image, p.outpath_samples, "Generate Working", self.target_seeds, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+        
+        if self.ddetailer_before_upscaler and not self.disable_upscaler:
+            output_image = self.upscale(p, output_image,
+                                        self.scalevalue, self.upscaler_sample, 
+                                        self.overlap, self.rewidth, self.reheight, self.denoising_strength,
+                                        self.detailer_mask_blur, self.dino_full_res_inpaint, self.dino_inpaint_padding)
+        devices.torch_gc()
+        
+        if not self.disable_detailer:
+            output_image = self.dino_detect_detailer(p, output_image, 
+                                                     self.disable_mask_paint_mode, self.inpaint_mask_mode, self.detailer_sample, self.detailer_sam_model, self.detailer_dino_model, 
+                                                     self.dino_full_res_inpaint, self.dino_inpaint_padding, self.detailer_mask_blur,
+                                                     self.dino_detect_count,
+                                                     self.dino_detection_prompt_list,
+                                                     self.dino_detection_positive_list,
+                                                     self.dino_detection_negative_list,
+                                                     self.dino_detection_denoise_list,
+                                                     self.dino_detection_cfg_list,
+                                                     self.dino_detection_steps_list,
+                                                     self.dino_detection_spliter_disable_list,
+                                                     self.dino_detection_spliter_remove_area_list)
+        devices.torch_gc()
+        
+        if not self.ddetailer_before_upscaler and not self.disable_upscaler:
+            output_image = self.upscale(p, output_image,
+                                        self.scalevalue, self.upscaler_sample, 
+                                        self.overlap, self.rewidth, self.reheight, self.denoising_strength,
+                                        self.detailer_mask_blur, self.dino_full_res_inpaint, self.dino_inpaint_padding)
+        devices.torch_gc()
+        
+        if not self.disable_watermark:
+            output_image = self.watermark(p, output_image)
+        
+        devices.torch_gc()
+        self.batch_number += 1
+        self.restore_script(p)
+        pp.image = output_image
 
 def on_ui_settings():
     section = ('ddsd_script', "DDSD")

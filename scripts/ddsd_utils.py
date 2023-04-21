@@ -4,7 +4,7 @@ import cv2
 import gc
 import matplotlib.font_manager
 from PIL import Image, ImageDraw, ImageFont
-from scripts.sam import sam_predict
+from scripts.sam import sam_predict, clear_cache
 from modules.devices import torch_gc
 from skimage import measure
 
@@ -37,8 +37,7 @@ def combine_masks(mask, combine_masks_option, mask2):
     if combine_masks_option == 'NAND': return cv2.bitwise_not(cv2.bitwise_and(mask,mask2))
 
 def dino_detect_from_prompt(prompt:str, detailer_sam_model, detailer_dino_model, init_image, disable_mask_paint_mode, inpaint_mask_mode, image_mask):
-    gc.collect()
-    torch_gc()
+    clear_cache()
     image_np_zero = np.array(init_image.convert('L'))
     image_np_zero[:,:] = 0
     image_np = np.array(init_image)
@@ -46,6 +45,7 @@ def dino_detect_from_prompt(prompt:str, detailer_sam_model, detailer_dino_model,
     image_set = (init_image, image_np, image_np_rgb, image_np_zero)
     model_set = (detailer_sam_model, detailer_dino_model)
     result = dino_prompt_detector(prompt, model_set, image_set)
+    clear_cache()
     if np.array_equal(result, image_np_zero): return None
     if not disable_mask_paint_mode: return result
     image_mask = np.array(image_mask.resize((result.shape[1],result.shape[0])).convert('L'))
@@ -170,7 +170,15 @@ def I2I_Generator_Create(p, i2i_sample, i2i_mask_blur, full_res_inpainting, inpa
     return i2i
 
 def get_fonts_list():
-    return [matplotlib.font_manager.FontProperties(fname=x).get_name() for x in matplotlib.font_manager.findSystemFonts()], {matplotlib.font_manager.FontProperties(fname=x).get_name():x for x in matplotlib.font_manager.findSystemFonts()}
+    fonts, font_paths = [], {}
+    fonts_list = matplotlib.font_manager.findSystemFonts()
+    for font in fonts_list:
+        try:
+            fonts.append(matplotlib.font_manager.FontProperties(fname=font).get_name())
+            font_paths[fonts[-1]] = font
+        except RuntimeError:
+            print(f'Skip font file: {font}')
+    return fonts, font_paths
 
 def image_apply_watermark(image, watermark_type, watermark_position, watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size, watermark_padding, watermark_alpha):
     gc.collect()
