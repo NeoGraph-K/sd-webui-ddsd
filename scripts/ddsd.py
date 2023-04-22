@@ -10,7 +10,7 @@ from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover
 
 import modules
 from modules import processing, shared, images, devices, modelloader
-from modules.processing import StableDiffusionProcessingImg2Img, create_infotext
+from modules.processing import StableDiffusionProcessingImg2Img, create_infotext, StableDiffusionProcessingTxt2Img
 from modules.shared import opts, state
 from modules.sd_models import model_hash
 from modules.paths import models_path
@@ -317,7 +317,7 @@ class Script(modules.scripts.Script):
                 dino_detection_positive_list[detect_index] if dino_detection_positive_list[detect_index] else self.target_prompts,
                 dino_detection_negative_list[detect_index] if dino_detection_negative_list[detect_index] else self.target_negative_prompts
             )
-            mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_image, not disable_mask_paint_mode and isinstance(p, StableDiffusionProcessingImg2Img), inpaint_mask_mode, getattr(p,'image_mask',None))
+            mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_image, disable_mask_paint_mode or isinstance(p, StableDiffusionProcessingTxt2Img), inpaint_mask_mode, getattr(p,'image_mask',None))
             if mask is not None:
                 if not dino_detection_spliter_disable_list[detect_index]:
                     mask = mask_spliter_and_remover(mask, dino_detection_spliter_remove_area_list[detect_index])
