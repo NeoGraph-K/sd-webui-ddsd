@@ -1,18 +1,38 @@
+import os
 import re
 import numpy as np
 import cv2
 import gc
 import matplotlib.font_manager
+from glob import glob
 from PIL import Image, ImageDraw, ImageFont
-from scripts.sam import sam_predict, clear_cache
+from scripts.sam import sam_predict, clear_cache, dilate_mask
 from modules.devices import torch_gc
 from skimage import measure
 
+from modules.paths import models_path
 from modules.processing import StableDiffusionProcessingImg2Img
 
 token_split = re.compile(r"(AND|OR|NOR|XOR|NAND)")
 token_first = re.compile(r'\(([^()]+)\)')
 token_match = re.compile(r'(\d+)GROUPMASK')
+token_file = re.compile(r'\s*<(.*)>\s*')
+
+ddsd_mask_path = os.path.join(models_path, "ddsdmask")
+mask_embed = {}
+
+def startup():
+    global mask_embed
+    if not os.path.exists(ddsd_mask_path):
+        os.makedirs(ddsd_mask_path)
+        with open(os.path.join(ddsd_mask_path, 'put_in_mask_here.txt'),'w') as f: pass
+    
+    masks = glob(os.path.join(ddsd_mask_path,'**\\*'))
+    masks = [(x, *os.path.splitext(os.path.basename(x))) for x in masks if os.path.isfile(x)]
+    masks = [(x, y) for x, y, z in masks if z in ['.png', '.jpg', '.jpeg', '.webp']]
+    mask_embed = {y.upper():x for x, y in masks}
+
+startup()
 
 def try_convert(data, type, default, min, max):
     try:
@@ -47,20 +67,46 @@ def dino_detect_from_prompt(prompt:str, detailer_sam_model, detailer_dino_model,
     result = dino_prompt_detector(prompt, model_set, image_set)
     clear_cache()
     if np.array_equal(result, image_np_zero): return None
-    if not disable_mask_paint_mode: return result
+    if disable_mask_paint_mode: return result
     image_mask = np.array(image_mask.resize((result.shape[1],result.shape[0])).convert('L'))
     image_mask = np.resize(image_mask, result.shape)
     if inpaint_mask_mode == 'Inner': return cv2.bitwise_and(result, image_mask)
     if inpaint_mask_mode == 'Outer': return cv2.bitwise_and(result, cv2.bitwise_not(image_mask))
     return None
     
+def dino_prompt_token_file(prompt:str, image_np_zero):
+    usage_type, usage, dilation = prompt_spliter(prompt, ':', 3)
+    usage_type = usage_type.upper()
+    usage = usage.upper()
+    if usage_type == 'AREA':
+        if usage == 'LEFT':
+            image_np_zero[:,:image_np_zero.shape[1] // 2] = 255
+            image_np_zero[:,image_np_zero.shape[1] // 2:] = 0
+        elif usage == 'RIGHT':
+            image_np_zero[:,:image_np_zero.shape[1] // 2] = 0
+            image_np_zero[:,image_np_zero.shape[1] // 2:] = 255
+        elif usage == 'TOP':
+            image_np_zero[:image_np_zero.shape[0] // 2,:] = 255
+            image_np_zero[image_np_zero.shape[0] // 2:,:] = 0
+        elif usage == 'BOTTOM':
+            image_np_zero[:image_np_zero.shape[0] // 2,:] = 0
+            image_np_zero[image_np_zero.shape[0] // 2:,:] = 255
+        elif usage == 'ALL':
+            image_np_zero[:,:] = 255
+    if usage_type == 'FILE':
+        if usage in mask_embed:
+            image = Image.open(mask_embed[usage]).convert('L')
+            h, w = image_np_zero.shape[:2]
+            image = image.resize((w, h))
+            image_np_zero = np.array(image)
+    return dilate_mask(image_np_zero, try_convert(dilation, int, 2, -512, 512))
 
 def dino_prompt_detector(prompt:str, model_set, image_set):
     find = token_first.search(prompt)
     result_group = {}
     result_count = 0
     while find:
-        result_group[f' {result_count}GROUPMASK '] = dino_prompt_detector(find.group(1), model_set, image_set)
+        result_group[f'{result_count}GROUPMASK'] = dino_prompt_detector(find.group(1), model_set, image_set)
         prompt = prompt.replace(find.group(), f' {result_count}GROUPMASK ')
         result_count += 1
         find = token_first.search(prompt)
@@ -70,37 +116,49 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
     while len(spliter) > 1:
         left, operator, right = spliter[:3]
         if not isinstance(left, np.ndarray):
-            match = token_match.match(left)
+            match = token_match.match(left.strip())
             if match is None:
-                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(left, ':', 4)
-                left = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
-                                   try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                   try_convert(dilation.strip(), int, 16, 0, 128), 
-                                   try_convert(sam_level.strip(), int, 0, 0, 2))
-                if left is None: left = image_set[3].copy()
+                match = token_file.match(left)
+                if match is None:
+                    dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(left, ':', 4)
+                    left = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
+                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
+                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(sam_level.strip(), int, 0, 0, 2))
+                    if left is None: left = image_set[3].copy()
+                else:
+                    left = dino_prompt_token_file(match.group(1), image_set[3].copy())
             else:
-                left = result_group[left]
+                left = result_group[left.strip()]
         if not isinstance(right, np.ndarray):
-            match = token_match.match(right)
+            match = token_match.match(right.strip())
             if match is None:
-                dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(right, ':', 4)
-                right = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
-                                   try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                   try_convert(dilation.strip(), int, 16, 0, 128), 
-                                   try_convert(sam_level.strip(), int, 0, 0, 2))
-                if right is None: right = image_set[3].copy()
+                match = token_file.match(right)
+                if match is None:
+                    dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(right, ':', 4)
+                    right = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
+                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
+                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(sam_level.strip(), int, 0, 0, 2))
+                    if right is None: right = image_set[3].copy()
+                else:
+                    right = dino_prompt_token_file(match.group(1), image_set[3].copy())
             else:
-                right = result_group[right]
+                right = result_group[right.strip()]
         spliter[:3] = [combine_masks(left, operator, right)]
         gc.collect()
         torch_gc()
     if isinstance(spliter[0], np.ndarray): return spliter[0]
-    dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(spliter[0], ':', 4)
-    target = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
-                                   try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                   try_convert(dilation.strip(), int, 16, 0, 128), 
-                                   try_convert(sam_level.strip(), int, 0, 0, 2))
-    if target is None: return image_set[3].copy()
+    match = token_file.match(spliter[0])
+    if match is None:
+        dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(spliter[0], ':', 4)
+        target = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
+                                    try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
+                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(sam_level.strip(), int, 0, 0, 2))
+        if target is None: return image_set[3].copy()
+    else:
+        target = dino_prompt_token_file(match.group(1), image_set[3].copy())
     return target
 
 def mask_spliter_and_remover(mask, area):

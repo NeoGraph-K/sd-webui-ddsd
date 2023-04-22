@@ -1,11 +1,7 @@
 import os
 import math
-import copy
-from random import choice
-from glob import glob
 
 import gradio as gr
-import numpy as np
 from PIL import Image
 
 from scripts.sam import sam_model_list
@@ -22,7 +18,6 @@ from modules.scripts import AlwaysVisible
 
 from basicsr.utils.download_util import load_file_from_url
 
-dd_models_path = os.path.join(models_path, "mmdet")
 grounding_models_path = os.path.join(models_path, "grounding")
 sam_models_path = os.path.join(models_path, "sam")
 
