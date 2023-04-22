@@ -99,7 +99,7 @@ def dino_prompt_token_file(prompt:str, image_np_zero):
             h, w = image_np_zero.shape[:2]
             image = image.resize((w, h))
             image_np_zero = np.array(image)
-    return dilate_mask(image_np_zero, try_convert(dilation, int, 2, -512, 512))
+    return dilate_mask(image_np_zero, try_convert(dilation, int, 2, 0, 512))
 
 def dino_prompt_detector(prompt:str, model_set, image_set):
     find = token_first.search(prompt)
@@ -123,7 +123,7 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
                     dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(left, ':', 4)
                     left = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                     try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(dilation.strip(), int, 16, 0, 512), 
                                     try_convert(sam_level.strip(), int, 0, 0, 2))
                     if left is None: left = image_set[3].copy()
                 else:
@@ -138,7 +138,7 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
                     dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(right, ':', 4)
                     right = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                     try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(dilation.strip(), int, 16, 0, 512), 
                                     try_convert(sam_level.strip(), int, 0, 0, 2))
                     if right is None: right = image_set[3].copy()
                 else:
@@ -154,7 +154,7 @@ def dino_prompt_detector(prompt:str, model_set, image_set):
         dino_text, sam_level, dino_box_threshold, dilation = prompt_spliter(spliter[0], ':', 4)
         target = sam_predict(model_set[0], model_set[1], image_set[0], image_set[1], image_set[2], dino_text, 
                                     try_convert(dino_box_threshold.strip(), float, 0.3, 0, 1.0), 
-                                    try_convert(dilation.strip(), int, 16, -512, 512), 
+                                    try_convert(dilation.strip(), int, 16, 0, 512), 
                                     try_convert(sam_level.strip(), int, 0, 0, 2))
         if target is None: return image_set[3].copy()
     else:
