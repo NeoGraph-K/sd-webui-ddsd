@@ -165,7 +165,7 @@ class Script(modules.scripts.Script):
                         dino_tabs = dino_tabs_acc
                     dino_full_res_inpaint = gr.Checkbox(label='Inpaint at full resolution ', elem_id='detailer_full_res', value=True, visible = False)
                     with gr.Row():
-                        dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=32, visible=False)
+                        dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=0, visible=False)
                         detailer_mask_blur = gr.Slider(label='Detailer Blur', elem_id='detailer_mask_blur', minimum=0, maximum=64, step=1, value=4, visible=False)
                         
             with gr.Accordion("Watermark", open=False, elem_id='ddsd_watermark_option'):
