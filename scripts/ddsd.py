@@ -391,6 +391,8 @@ class Script(modules.scripts.Script):
                 p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
                 p.extra_generation_params[f'DINO {detect_index + 1} Spliter'] = not dino_detection_spliter_disable_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} Ckpt Model'] = dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname
+                p.extra_generation_params[f'DINO {detect_index + 1} Vae Model'] = dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae
             else:
                 p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = "Error"
@@ -400,6 +402,8 @@ class Script(modules.scripts.Script):
                 p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
                 p.extra_generation_params[f'DINO {detect_index + 1} Spliter'] = not dino_detection_spliter_disable_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
+                p.extra_generation_params[f'DINO {detect_index + 1} Ckpt Model'] = dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname
+                p.extra_generation_params[f'DINO {detect_index + 1} Vae Model'] = dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae
         return init_image
     
     def upscale(self, p, init_image, 
@@ -419,6 +423,8 @@ class Script(modules.scripts.Script):
         p.extra_generation_params[f'Tile upscale height'] = reheight
         p.extra_generation_params[f'Tile upscale overlap'] = overlap
         p.extra_generation_params[f'Tile upscale upscaler'] = self.upscaler.name
+        p.extra_generation_params[f'Tile upscale Ckpt Model'] = upscaler_ckpt if upscaler_ckpt != 'Original' else self.ckptname
+        p.extra_generation_params[f'Tile upscale Vae Model'] = upscaler_vae if upscaler_vae != 'Original' else self.vae
         if(self.upscaler.name != "None"): 
             img = self.upscaler.scaler.upscale(init_image, scalevalue, self.upscaler.data_path)
         else:
