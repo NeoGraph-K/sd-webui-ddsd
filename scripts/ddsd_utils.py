@@ -224,6 +224,7 @@ def I2I_Generator_Create(p, i2i_sample, i2i_mask_blur, full_res_inpainting, inpa
     i2i.script_args = script_args
     i2i.prompt = positive
     i2i.negative_prompt = negative
+    i2i.sub_processing = True
     
     return i2i
 

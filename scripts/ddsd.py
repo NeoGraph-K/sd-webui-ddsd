@@ -326,23 +326,39 @@ class Script(modules.scripts.Script):
                         pi.init_images = [init_image]
                         pi.image_mask = Image.fromarray(mask_split)
                         if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                            images.save_image(pi.image_mask, p.outpath_samples, "Mask", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                            images.save_image(pi.image_mask, p.outpath_samples, 
+                                          shared.opts.data.get('save_ddsd_working_on_dino_mask_images_prefix', ''), 
+                                          pi.seed, self.target_prompts, opts.samples_format, 
+                                          suffix='' if shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '')}",
+                                          info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                         state.job_count += 1
                         processed = processing.process_images(pi)
                         init_image = processed.images[0]
                         if shared.opts.data.get('save_ddsd_working_on_images', False):
-                            images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                            images.save_image(init_image, p.outpath_samples, 
+                                            shared.opts.data.get('save_ddsd_working_on_images_prefix', ''), 
+                                            pi.seed, self.target_prompts, opts.samples_format, 
+                                            suffix='' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
+                                            info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                 else:
                     pi.seed = self.target_seeds + detect_index
                     pi.init_images = [init_image]
                     pi.image_mask = Image.fromarray(mask)
                     if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                        images.save_image(pi.image_mask, p.outpath_samples, "Mask", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                        images.save_image(pi.image_mask, p.outpath_samples, 
+                                          shared.opts.data.get('save_ddsd_working_on_dino_mask_images_prefix', ''), 
+                                          pi.seed, self.target_prompts, opts.samples_format, 
+                                          suffix='' if shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '')}",
+                                          info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                     state.job_count += 1
                     processed = processing.process_images(pi)
                     init_image = processed.images[0]
                     if shared.opts.data.get('save_ddsd_working_on_images', False):
-                        images.save_image(init_image, p.outpath_samples, "Mask_Result", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+                        images.save_image(init_image, p.outpath_samples, 
+                                          shared.opts.data.get('save_ddsd_working_on_images_prefix', ''), 
+                                          pi.seed, self.target_prompts, opts.samples_format, 
+                                          suffix='' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
+                                          info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                 p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "original"
                 p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = processed.all_negative_prompts[0] if dino_detection_negative_list[detect_index] else "original"
@@ -411,12 +427,20 @@ class Script(modules.scripts.Script):
                     image_index += 1
         init_image = images.combine_grid(grid)
         if shared.opts.data.get('save_ddsd_working_on_images', False):
-            images.save_image(init_image, p.outpath_samples, "Upscale Working", pi.seed, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+            images.save_image(init_image, p.outpath_samples, 
+                              shared.opts.data.get('save_ddsd_working_on_images_prefix', ''), 
+                              pi.seed, self.target_prompts, opts.samples_format, 
+                              suffix = '' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
+                              info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
         return init_image
     
     def watermark(self, p, init_image):
         if shared.opts.data.get('save_ddsd_watermark_with_and_without', False):
-            images.save_image(init_image, p.outpath_samples, "Without_Watermark", self.target_seeds, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+            images.save_image(init_image, p.outpath_samples, 
+                              shared.opts.data.get('save_ddsd_watermark_with_and_without_prefix', ''), 
+                              self.target_seeds, self.target_prompts, opts.samples_format, 
+                              suffix= '' if shared.opts.data.get('save_ddsd_watermark_with_and_without_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_watermark_with_and_without_suffix', '')}",
+                              info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
         for water_index in range(self.watermark_count):
             init_image = image_apply_watermark(init_image, 
                                                 self.watermark_type_list[water_index],
@@ -439,6 +463,7 @@ class Script(modules.scripts.Script):
             disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
             *args):
+        if getattr(p, 'sub_processing', False): return
         self.restore_script(p)
         self.enable_script_names = enable_script_names
         self.disable_watermark = disable_watermark
@@ -483,11 +508,13 @@ class Script(modules.scripts.Script):
         self.watermark_padding_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 9:self.dino_detect_count * 8 + self.watermark_count * 10]
         self.watermark_alpha_list = args_list[self.dino_detect_count * 8 + self.watermark_count * 10:self.dino_detect_count * 8 + self.watermark_count * 11]
         self.script_names_list = [x.strip()+'.py' for x in enable_script_names.split(';') if len(x) > 1]
+        self.script_names_list += [os.path.basename(__file__)]
         self.i2i_scripts = [x for x in self.original_scripts if os.path.basename(x.filename) in self.script_names_list].copy()
         self.i2i_scripts_always = [x for x in self.original_scripts_always if os.path.basename(x.filename) in self.script_names_list].copy()
         self.upscaler = shared.sd_upscalers[upscaler_index]
     
     def before_process_batch(self, p, *args, **kargs):
+        if getattr(p, 'sub_processing', False): return
         self.iter_number = kargs['batch_number']
         self.batch_number = 0
     
@@ -502,13 +529,18 @@ class Script(modules.scripts.Script):
         p.scripts.alwayson_scripts = self.original_scripts_always.copy()
     
     def postprocess_image(self, p, pp, *args):
+        if getattr(p, 'sub_processing', False): return
         devices.torch_gc()
         output_image = pp.image
         self.target_prompts = p.all_prompts[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
         self.target_negative_prompts = p.all_negative_prompts[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
         self.target_seeds = p.all_seeds[self.iter_number * p.batch_size:(self.iter_number + 1) * p.batch_size][self.batch_number]
         if shared.opts.data.get('save_ddsd_working_on_images', False):
-            images.save_image(output_image, p.outpath_samples, "Generate Working", self.target_seeds, self.target_prompts, opts.samples_format, info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+            images.save_image(output_image, p.outpath_samples, 
+                              shared.opts.data.get('save_ddsd_working_on_images_prefix', ''), 
+                              self.target_seeds, self.target_prompts, opts.samples_format, 
+                              suffix= '' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
+                              info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
         
         if self.ddetailer_before_upscaler and not self.disable_upscaler:
             output_image = self.upscale(p, output_image,
@@ -551,12 +583,26 @@ def on_ui_settings():
     section = ('ddsd_script', "DDSD")
     shared.opts.add_option("save_ddsd_working_on_images", shared.OptionInfo(
         False, "Save all images you are working on", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_working_on_images_prefix", shared.OptionInfo(
+        '', "Save all images you are working on prefix", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_working_on_images_suffix", shared.OptionInfo(
+        'Working_On', "Save all images you are working on suffix", gr.Textbox, {"interactive": True}, section=section))
+    
     shared.opts.add_option("save_ddsd_working_on_dino_mask_images", shared.OptionInfo(
         False, "Save dino mask images you are working on", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_working_on_dino_mask_images_prefix", shared.OptionInfo(
+        '', "Save dino mask images you are working on prefix", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_working_on_dino_mask_images_suffix", shared.OptionInfo(
+        'Mask', "Save dino mask images you are working on suffix", gr.Textbox, {"interactive": True}, section=section))
     shared.opts.add_option("dino_detect_count", shared.OptionInfo(
         2, "Dino Detect Max Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
+    
     shared.opts.add_option("save_ddsd_watermark_with_and_without", shared.OptionInfo(
         False, "Save with and without watermark ", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_watermark_with_and_without_prefix", shared.OptionInfo(
+        '', "Save with and without watermark prefix", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_watermark_with_and_without_suffix", shared.OptionInfo(
+        'Without', "Save with and without watermark suffix", gr.Textbox, {"interactive": True}, section=section))
     shared.opts.add_option("watermark_count", shared.OptionInfo(
         1, "Watermark Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
 
