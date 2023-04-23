@@ -600,6 +600,7 @@ class Script(modules.scripts.Script):
             output_image = self.upscale(p, output_image,
                                         self.scalevalue, self.upscaler_sample, 
                                         self.overlap, self.rewidth, self.reheight, self.denoising_strength,
+                                        self.upscaler_ckpt, self.upscaler_vae,
                                         self.detailer_mask_blur, self.dino_full_res_inpaint, self.dino_inpaint_padding)
         devices.torch_gc()
         
@@ -624,6 +625,7 @@ class Script(modules.scripts.Script):
             output_image = self.upscale(p, output_image,
                                         self.scalevalue, self.upscaler_sample, 
                                         self.overlap, self.rewidth, self.reheight, self.denoising_strength,
+                                        self.upscaler_ckpt, self.upscaler_vae,
                                         self.detailer_mask_blur, self.dino_full_res_inpaint, self.dino_inpaint_padding)
         devices.torch_gc()
         
