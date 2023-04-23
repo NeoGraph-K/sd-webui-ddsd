@@ -13,7 +13,7 @@ from PIL import Image
 from collections import OrderedDict
 from scipy.ndimage import binary_dilation
 from segment_anything import SamPredictor, sam_model_registry
-from scripts.dino import dino_predict_internal, clear_dino_cache
+from scripts.ddsd_dino import dino_predict_internal, clear_dino_cache
 
 sam_model_cache = OrderedDict()
 sam_model_dir = os.path.join(models_path, "sam")

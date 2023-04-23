@@ -6,7 +6,7 @@ import gc
 import matplotlib.font_manager
 from glob import glob
 from PIL import Image, ImageDraw, ImageFont
-from scripts.sam import sam_predict, clear_cache, dilate_mask
+from scripts.ddsd_sam import sam_predict, clear_cache, dilate_mask
 from modules.devices import torch_gc
 from skimage import measure
 
@@ -68,6 +68,7 @@ def dino_detect_from_prompt(prompt:str, detailer_sam_model, detailer_dino_model,
     clear_cache()
     if np.array_equal(result, image_np_zero): return None
     if disable_mask_paint_mode: return result
+    if image_mask is None: return result
     image_mask = np.array(image_mask.resize((result.shape[1],result.shape[0])).convert('L'))
     image_mask = np.resize(image_mask, result.shape)
     if inpaint_mask_mode == 'Inner': return cv2.bitwise_and(result, image_mask)

@@ -4,8 +4,8 @@ import math
 import gradio as gr
 from PIL import Image
 
-from scripts.sam import sam_model_list
-from scripts.dino import dino_model_list
+from scripts.ddsd_sam import sam_model_list
+from scripts.ddsd_dino import dino_model_list
 from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create, get_fonts_list, image_apply_watermark
 
 import modules
