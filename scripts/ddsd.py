@@ -452,11 +452,11 @@ class Script(modules.scripts.Script):
             p.seed = processed.seed + 1
             work_results += processed.images
 
-            image_index = 0
-            for y, h, row in grid.tiles:
-                for tiledata in row:
-                    tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
-                    image_index += 1
+        image_index = 0
+        for y, h, row in grid.tiles:
+            for tiledata in row:
+                tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
+                image_index += 1
         init_image = images.combine_grid(grid)
         if shared.opts.data.get('save_ddsd_working_on_images', False):
             images.save_image(init_image, p.outpath_samples, 
