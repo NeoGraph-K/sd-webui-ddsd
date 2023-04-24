@@ -489,8 +489,8 @@ class Script(modules.scripts.Script):
         return init_image
 
     def change_vae_model(self, name:str):
-        if name in ['auto', 'automatic']: modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=modules.sd_vae.unspecified)
-        elif name == 'none': modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=None)
+        if name.lower() in ['auto', 'automatic']: modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=modules.sd_vae.unspecified)
+        elif name.lower() == 'none': modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=None)
         else: modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=modules.sd_vae.vae_dict[name])
     
     def change_ckpt_model(self, name:str):
