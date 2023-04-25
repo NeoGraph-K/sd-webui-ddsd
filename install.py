@@ -84,6 +84,11 @@ with open(req_file) as file:
                     f'install scikit-image',
                     f'sd-webui-ddsd requirement: scikit-image'
                 )
+            elif lib == 'pillow_lut':
+                launch.run_pip(
+                    f'install pillow_lut',
+                    f'sd-webui-ddsd requirement: pillow_lut'
+                )
             else:
                 launch.run_pip(
                     f'install {lib}',

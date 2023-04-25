@@ -7,6 +7,7 @@ from PIL import Image
 
 from scripts.ddsd_sam import sam_model_list
 from scripts.ddsd_dino import dino_model_list
+from scripts.ddsd_postprocess import lut_model_list, ddsd_postprocess
 from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create, get_fonts_list, image_apply_watermark
 
 import modules
@@ -21,11 +22,12 @@ from basicsr.utils.download_util import load_file_from_url
 
 grounding_models_path = os.path.join(models_path, "grounding")
 sam_models_path = os.path.join(models_path, "sam")
+lut_models_path = os.path.join(models_path, 'lut')
 
-ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\]+)\\s*\\[.*\\]')
+ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\\\+\\(\\)]+)\\s*\\[.*\\]')
 
-def list_models(model_path):
-        model_list = modelloader.load_models(model_path=model_path, ext_filter=[".pth"])
+def list_models(model_path, filter):
+        model_list = modelloader.load_models(model_path=model_path, ext_filter=[filter])
         
         def modeltitle(path, shorthash):
             abspath = os.path.abspath(path)
@@ -51,7 +53,7 @@ def list_models(model_path):
         return models
         
 def startup():
-    if (len(list_models(grounding_models_path)) == 0):
+    if (len(list_models(grounding_models_path, '.pth')) == 0):
         print("No detection groundingdino models found, downloading...")
         load_file_from_url('https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth',grounding_models_path)
         load_file_from_url('https://raw.githubusercontent.com/IDEA-Research/GroundingDINO/main/groundingdino/config/GroundingDINO_SwinT_OGC.py',grounding_models_path, file_name='groundingdino_swint_ogc.py')
@@ -59,11 +61,58 @@ def startup():
         #load_file_from_url('https://raw.githubusercontent.com/IDEA-Research/GroundingDINO/main/groundingdino/config/GroundingDINO_SwinB.cfg.py',grounding_models_path, file_name='groundingdino_swinb_cogcoor.py')
         
         
-    if (len(list_models(sam_models_path)) == 0):
+    if (len(list_models(sam_models_path, '.pth')) == 0):
         print("No detection sam models found, downloading...")
         #load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth',sam_models_path)
         #load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth',sam_models_path)
         load_file_from_url('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth',sam_models_path)
+        
+    if (len(list_models(lut_models_path, '.cube')) == 0): # Free use lut files.
+        print('No detection lut models found, downloading...')
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Arabica%2012.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Ava%20614.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Azrael%2093.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Bourbon%2064.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Byers%2011.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Chemical%20168.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Clayton%2033.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Clouseau%2054.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Cobi%203.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Contrail%2035.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Cubicle%2099.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Django%2025.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Domingo%20145.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineBasic.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineBright.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineCold.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineDrama.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineTealOrange1.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineTealOrange2.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineVibrant.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineWarm.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Faded%2047.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Folger%2050.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Fusion%2088.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Hyla%2068.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Korben%20214.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/LBK-K-Tone_33.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Lenox%20340.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Lucky%2064.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/McKinnon%2075.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Milo%205.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Neon%20770.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Paladin%201875.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Pasadena%2021.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Pitaya%2015.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Reeve%2038.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Remy%2024.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Sprocket%20231.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Teigen%2028.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Trent%2018.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Tweed%2071.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Vireo%2037.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Zed%2032.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Zeke%2039.CUBE', lut_models_path)
 
 startup()
 
@@ -75,6 +124,9 @@ class Script(modules.scripts.Script):
         self.original_scripts = None
         self.original_scripts_always = None
         _ ,self.font_path = get_fonts_list()
+        self.ckptname = None
+        self.vae = None
+        self.clip_skip = 1
         
     def title(self):
         return "ddetailer + sdupscale"
@@ -83,6 +135,11 @@ class Script(modules.scripts.Script):
         return AlwaysVisible
 
     def ui(self, is_img2img):
+        pp_types = [
+            'none', 
+            'saturation','sharpening','gaussian blur','brightness','color','contrast',
+            #'color extraction',
+            'hue', 'inversion', 'bilateral','color tint(type)','color tint(lut)']
         ckpt_list = list(sd_models.checkpoints_list.keys())
         ckpt_list.insert(0, 'Original')
         vae_list = list(sd_vae.vae_dict.keys())
@@ -102,10 +159,23 @@ class Script(modules.scripts.Script):
         dino_detection_steps_list = []
         dino_detection_spliter_disable_list = []
         dino_detection_spliter_remove_area_list = []
+        dino_detection_clip_skip_list = []
+        pp_type_list = []
+        pp_saturation_strength_list = []
+        pp_sharpening_radius_list = []
+        pp_sharpening_percent_list = []
+        pp_sharpening_threshold_list = []
+        pp_gaussian_radius_list = []
+        pp_brightness_strength_list = []
+        pp_color_strength_list = []
+        pp_contrast_strength_list = []
+        pp_hue_strength_list = []
+        pp_bilateral_sigmaC_list = []
+        pp_bilateral_sigmaS_list = []
+        pp_color_tint_type_name_list = []
+        pp_color_tint_lut_name_list = []
         watermark_type_list = []
         watermark_position_list = []
-        watermark_image_gr_list = []
-        watermark_text_gr_list = []
         watermark_image_list = []
         watermark_image_size_width_list = []
         watermark_image_size_height_list = []
@@ -117,6 +187,7 @@ class Script(modules.scripts.Script):
         watermark_alpha_list = []
         dino_tabs = None
         watermark_tabs = None
+        postprocess_tabs = None
         
         with gr.Accordion('DDSD', open=False, elem_id='ddsd_all_option_acc'):
         
@@ -125,7 +196,7 @@ class Script(modules.scripts.Script):
                     all_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I All process target script</p>')
                     enable_script_names = gr.Textbox(label="Enable Script(Extension)", elem_id="enable_script_names", value='dynamic_thresholding;dynamic_prompting',show_label=True, lines=1, placeholder="Extension python file name(ex - dynamic_thresholding;dynamic_prompting)")
         
-            with gr.Accordion("Upscaler", open=False, elem_id="ddsd_upsacler_acc"):
+            with gr.Accordion("Upscaler", open=False, elem_id="ddsd_upscaler_acc"):
                 with gr.Column():
                     sd_upscale_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I Upscaler Option</p>')
                     disable_upscaler = gr.Checkbox(label='Disable Upscaler', elem_id='disable_upscaler', value=True, visible=True)
@@ -152,7 +223,7 @@ class Script(modules.scripts.Script):
                     detailer_sample = gr.Dropdown(label='Detailer Sampling', elem_id='detailer_sample', choices=sample_list, value=sample_list[0], visible=False, type="value")
                     with gr.Row():
                         detailer_sam_model = gr.Dropdown(label='Detailer SAM Model', elem_id='detailer_sam_model', choices=sam_model_list(), value=sam_model_list()[0], visible=False)
-                        detailer_dino_model = gr.Dropdown(label='Deteiler DINO Model', elem_id='detailer_dino_model', choices=dino_model_list(), value=dino_model_list()[0], visible=False)
+                        detailer_dino_model = gr.Dropdown(label='Detailer DINO Model', elem_id='detailer_dino_model', choices=dino_model_list(), value=dino_model_list()[0], visible=False)
                     with gr.Tabs(elem_id = 'dino_detct_arguments', visible=False) as dino_tabs_acc:
                         for index in range(shared.opts.data.get('dino_detect_count', 2)):
                             with gr.Tab(f'DINO {index + 1} Argument', elem_id=f'dino_{index + 1}_argument_tab'):
@@ -168,6 +239,7 @@ class Script(modules.scripts.Script):
                                 dino_detection_steps = gr.Slider(minimum=0, maximum=150, step=1, elem_id=f'dino_detect_{index+1}_steps', label=f'DINO {index + 1} Steps(0 to Origin)', value=0, visible=True)
                                 dino_detection_spliter_disable = gr.Checkbox(label=f'Disable DINO {index + 1} Detect Split Mask', value=True, visible=True)
                                 dino_detection_spliter_remove_area = gr.Slider(minimum=0, maximum=800, step=8, elem_id=f'dino_detect_{index+1}_remove_area', label=f'Remove {index + 1} Area', value=16, visible=True)
+                                dino_detection_clip_skip = gr.Slider(minimum=0, maximum=10, step=1, elem_id=f'dino_detect_{index+1}_clip_skip', label=f'Clip skip {index + 1} Inpaint(0 to Origin)', value=0, visible=True)
                                 dino_detection_ckpt_list.append(dino_detection_ckpt)
                                 dino_detection_vae_list.append(dino_detection_vae)
                                 dino_detection_prompt_list.append(dino_detection_prompt)
@@ -178,12 +250,75 @@ class Script(modules.scripts.Script):
                                 dino_detection_steps_list.append(dino_detection_steps)
                                 dino_detection_spliter_disable_list.append(dino_detection_spliter_disable)
                                 dino_detection_spliter_remove_area_list.append(dino_detection_spliter_remove_area)
+                                dino_detection_clip_skip_list.append(dino_detection_clip_skip)
                         dino_tabs = dino_tabs_acc
                     dino_full_res_inpaint = gr.Checkbox(label='Inpaint at full resolution ', elem_id='detailer_full_res', value=True, visible = False)
                     with gr.Row():
                         dino_inpaint_padding = gr.Slider(label='Inpaint at full resolution padding, pixels ', elem_id='detailer_padding', minimum=0, maximum=256, step=4, value=0, visible=False)
                         detailer_mask_blur = gr.Slider(label='Detailer Blur', elem_id='detailer_mask_blur', minimum=0, maximum=64, step=1, value=4, visible=False)
-                        
+                
+            with gr.Accordion("Postprocessing", open=False, elem_id='ddsd_post_processing'):
+                with gr.Column():
+                    postprocess_info = gr.HTML('<br><p style="margin-bottom:0.75em">Postprocessing to the final image</p>')
+                    disable_postprocess = gr.Checkbox(label='Disable PostProcess', elem_id='disable_postprocess',value=True, visible=True)
+                    with gr.Tabs(elem_id = 'ddsd_postprocess_arguments', visible=False) as postprocess_tabs_acc:
+                        for index in range(shared.opts.data.get('postprocessing_count', 1)):
+                            with gr.Tab(f'Postprocessing {index + 1} Argument', elem_id=f'postprocessing_{index + 1}_argument_tab'):
+                                pp_type = gr.Dropdown(label=f'Postprocessing type {index+1}', elem_id=f'postprocessing_{index+1}', choices=pp_types, value=pp_types[0], visible=True)
+                                pp_saturation_strength = gr.Slider(label=f'Saturation strength {index+1}', minimum=0, maximum=3, step=0.01, value=1.1, visible=False)
+                                pp_sharpening_radius = gr.Slider(label=f'Sharpening radius {index+1}', minimum=0, maximum=50, step=1, value=2, visible=False)
+                                pp_sharpening_percent = gr.Slider(label=f'Sharpening percent {index+1}', minimum=0, maximum=300, step=1, value=150, visible=False)
+                                pp_sharpening_threshold = gr.Slider(label=f'Sharpening threshold {index+1}', minimum=0, maximum=10, step=0.01, value=3, visible=False)
+                                pp_gaussian_radius = gr.Slider(label=f'Gaussian Blur radius {index+1}', minimum=0, maximum=50, step=1, value=2, visible=False)
+                                pp_brightness_strength = gr.Slider(label=f'Brightness strength {index+1}', minimum=0, maximum=5, step=0.01, value=1.1, visible=False)
+                                pp_color_strength = gr.Slider(label=f'Color strength {index+1}', minimum=0, maximum=5, step=0.01, value=1.1, visible=False)
+                                pp_contrast_strength = gr.Slider(label=f'Contrast strength {index+1}', minimum=0, maximum=5, step=0.01, value=1.1, visible=False)
+                                pp_hue_strength = gr.Slider(label=f'Hue strength {index+1}', minimum=-1, maximum=1, step=0.01, value=0, visible=False)
+                                pp_bilateral_sigmaC = gr.Slider(label=f'Bilateral sigmaC {index+1}', minimum=0, maximum=100, step=1, value=10, visible=False)
+                                pp_bilateral_sigmaS = gr.Slider(label=f'Bilateral sigmaS {index+1}', minimum=0, maximum=30, step=1, value=10, visible=False)
+                                pp_color_tint_type_name = gr.Radio(label=f'Color tint type name {index+1}',choices=['warm', 'cool'], value='warm', visible=False)
+                                pp_color_tint_lut_name = gr.Dropdown(label=f'Color tint lut name {index+1}',choices=lut_model_list(), value=lut_model_list()[0], visible=False)
+                            pp_type_list.append(pp_type)
+                            pp_saturation_strength_list.append(pp_saturation_strength)
+                            pp_sharpening_radius_list.append(pp_sharpening_radius)
+                            pp_sharpening_percent_list.append(pp_sharpening_percent)
+                            pp_sharpening_threshold_list.append(pp_sharpening_threshold)
+                            pp_gaussian_radius_list.append(pp_gaussian_radius)
+                            pp_brightness_strength_list.append(pp_brightness_strength)
+                            pp_color_strength_list.append(pp_color_strength)
+                            pp_contrast_strength_list.append(pp_contrast_strength)
+                            pp_hue_strength_list.append(pp_hue_strength)
+                            pp_bilateral_sigmaC_list.append(pp_bilateral_sigmaC)
+                            pp_bilateral_sigmaS_list.append(pp_bilateral_sigmaS)
+                            pp_color_tint_type_name_list.append(pp_color_tint_type_name)
+                            pp_color_tint_lut_name_list.append(pp_color_tint_lut_name)
+                            def pp_type_change_func(pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name):
+                                saturation_strength, sharpening_radius, sharpening_percent, sharpening_threshold, gaussian_radius, brightness_strength, color_strength, contrast_strength, hue_strength, bilateral_sigmaC, bilateral_sigmaS, color_tint_type_name, color_tint_lut_name = pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name
+                                return lambda data:{
+                                    saturation_strength:gr_show(data == 'saturation'),
+                                    sharpening_radius:gr_show(data == 'sharpening'),
+                                    sharpening_percent:gr_show(data == 'sharpening'),
+                                    sharpening_threshold:gr_show(data == 'sharpening'),
+                                    gaussian_radius:gr_show(data == 'gaussian blur'),
+                                    brightness_strength:gr_show(data == 'brightness'),
+                                    color_strength:gr_show(data == 'color'),
+                                    contrast_strength:gr_show(data == 'contrast'),
+                                    hue_strength:gr_show(data == 'hue'),
+                                    bilateral_sigmaC:gr_show(data == 'bilateral'),
+                                    bilateral_sigmaS:gr_show(data == 'bilateral'),
+                                    color_tint_type_name:gr_show(data == 'color tint(type)'),
+                                    color_tint_lut_name:gr_show(data == 'color tint(lut)')
+                                }
+                            def pp_type_change_func2(pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name):
+                                saturation_strength, sharpening_radius, sharpening_percent, sharpening_threshold, gaussian_radius, brightness_strength, color_strength, contrast_strength, hue_strength, bilateral_sigmaC, bilateral_sigmaS, color_tint_type_name, color_tint_lut_name = pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name
+                                return [saturation_strength, sharpening_radius, sharpening_percent, sharpening_threshold, gaussian_radius, brightness_strength, color_strength, contrast_strength, hue_strength, bilateral_sigmaC, bilateral_sigmaS, color_tint_type_name, color_tint_lut_name]
+                            pp_type.change(
+                                pp_type_change_func(pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name),
+                                inputs=[pp_type],
+                                outputs=pp_type_change_func2(pp_saturation_strength,pp_sharpening_radius,pp_sharpening_percent,pp_sharpening_threshold,pp_gaussian_radius,pp_brightness_strength,pp_color_strength,pp_contrast_strength,pp_hue_strength,pp_bilateral_sigmaC,pp_bilateral_sigmaS,pp_color_tint_type_name,pp_color_tint_lut_name)
+                            )
+                        postprocess_tabs = postprocess_tabs_acc
+                            
             with gr.Accordion("Watermark", open=False, elem_id='ddsd_watermark_option'):
                 with gr.Column():
                     watermark_info = gr.HTML('<br><p style="margin-bottom:0.75em">Add a watermark to the final saved image</p>')
@@ -193,19 +328,17 @@ class Script(modules.scripts.Script):
                             with gr.Tab(f'Watermark {index + 1} Argument', elem_id=f'watermark_{index+1}_argument_tab'):
                                 watermark_type = gr.Radio(choices=['Text','Image'], value='Text', label=f'Watermark {index+1} text')
                                 watermark_position = gr.Dropdown(choices=['Left','Left-Top','Top','Right-Top','Right','Right-Bottom','Bottom','Left-Bottom','Center'], value='Center', label=f'Watermark {index+1} Position', elem_id=f'watermark_{index+1}_position')
-                                with gr.Column(visible=False) as watermark_image_gr:
-                                    watermark_image = gr.Image(label=f"Watermark {index+1} Upload image", visible=True)
+                                with gr.Column():
+                                    watermark_image = gr.Image(label=f"Watermark {index+1} Upload image", visible=False)
                                     with gr.Row():
-                                        watermark_image_size_width = gr.Slider(label=f'Watermark {index+1} Width', visible=True, minimum=50, maximum=500, step=10, value=100)
-                                        watermark_image_size_height = gr.Slider(label=f'Watermark {index+1} Height', visible=True, minimum=50, maximum=500, step=10, value=100)    
-                                    watermark_image_gr_list.append(watermark_image_gr)
-                                with gr.Column(visible=True) as watermark_text_gr:
+                                        watermark_image_size_width = gr.Slider(label=f'Watermark {index+1} Width', visible=False, minimum=50, maximum=500, step=10, value=100)
+                                        watermark_image_size_height = gr.Slider(label=f'Watermark {index+1} Height', visible=False, minimum=50, maximum=500, step=10, value=100)    
+                                with gr.Column():
                                     watermark_text = gr.Textbox(placeholder='watermark text - ex) Copyright © NeoGraph. All Rights Reserved.', visible=True, value='')
                                     with gr.Row():
                                         watermark_text_color = gr.ColorPicker(label=f'Watermark {index+1} Color')
                                         watermark_text_font = gr.Dropdown(label=f'Watermark {index+1} Fonts', choices=fonts_list, value=fonts_list[0])
                                         watermark_text_size = gr.Slider(label=f'Watermark {index+1} Size', visible=True, minimum=10, maximum=500, step=1, value=50)
-                                    watermark_text_gr_list.append(watermark_text_gr)
                                 watermark_padding = gr.Slider(label=f'Watermark {index+1} Padding', visible=True, minimum=0, maximum=200, step=1, value=10)
                                 watermark_alpha = gr.Slider(label=f'Watermark {index+1} Alpha', visible=True, minimum=0, maximum=1, step=0.01, value=0.4)
                             watermark_type_list.append(watermark_type)
@@ -219,20 +352,40 @@ class Script(modules.scripts.Script):
                             watermark_text_size_list.append(watermark_text_size)
                             watermark_padding_list.append(watermark_padding)
                             watermark_alpha_list.append(watermark_alpha)
-                            
+                            def watermark_type_change_func(watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size):
+                                image, image_size_width, iamge_size_height, text, text_color, text_font, text_size = watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size
+                                return lambda data:{
+                                    image:gr_show(data == 'Image'),
+                                    image_size_width:gr_show(data == 'Image'), 
+                                    iamge_size_height:gr_show(data == 'Image'), 
+                                    text:gr_show(data == 'Text'), 
+                                    text_color:gr_show(data == 'Text'), 
+                                    text_font:gr_show(data == 'Text'), 
+                                    text_size:gr_show(data == 'Text')
+                                }
+                            def watermark_type_change_func2(watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size):
+                                image, image_size_width, iamge_size_height, text, text_color, text_font, text_size = watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size
+                                return [image, image_size_width, iamge_size_height, text, text_color, text_font, text_size]
+                            watermark_type.change(
+                                watermark_type_change_func(watermark_image,watermark_image_size_width,watermark_image_size_height,watermark_text,watermark_text_color,watermark_text_font,watermark_text_size),
+                                inputs=[watermark_type],
+                                outputs=watermark_type_change_func2(watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size)
+                            )
                         watermark_tabs = watermark_tabs_acc
-        for index, watermark_type_data in enumerate(watermark_type_list):
-            watermark_type_data.change(
-                lambda type_data:dict(zip(watermark_image_gr_list+watermark_text_gr_list, [gr_show(type_data=='Image')]*len(watermark_image_gr_list)+[gr_show(type_data=='Text')]*len(watermark_text_gr_list))),
-                inputs=[watermark_type_data],
-                outputs=watermark_image_gr_list+watermark_text_gr_list
-            )
+        
         disable_watermark.change(
             lambda disable:{
                 watermark_tabs:gr_show(not disable)
             },
             inputs=[disable_watermark],
             outputs=watermark_tabs
+        )
+        disable_postprocess.change(
+            lambda disable:{
+                postprocess_tabs:gr_show(not disable)
+            },
+            inputs=[disable_postprocess],
+            outputs=postprocess_tabs
         )
         disable_upscaler.change(
             lambda disable: {
@@ -286,7 +439,7 @@ class Script(modules.scripts.Script):
         )
         
         ret += [enable_script_names]
-        ret += [disable_watermark]
+        ret += [disable_watermark, disable_postprocess]
         ret += [disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength, upscaler_ckpt, upscaler_vae]
         ret += [disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model, dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur]
         ret += dino_detection_ckpt_list + \
@@ -299,6 +452,7 @@ class Script(modules.scripts.Script):
                 dino_detection_steps_list + \
                 dino_detection_spliter_disable_list + \
                 dino_detection_spliter_remove_area_list + \
+                dino_detection_clip_skip_list + \
                 watermark_type_list + \
                 watermark_position_list + \
                 watermark_image_list + \
@@ -309,7 +463,21 @@ class Script(modules.scripts.Script):
                 watermark_text_font_list + \
                 watermark_text_size_list + \
                 watermark_padding_list + \
-                watermark_alpha_list
+                watermark_alpha_list + \
+                pp_type_list + \
+                pp_saturation_strength_list + \
+                pp_sharpening_radius_list + \
+                pp_sharpening_percent_list + \
+                pp_sharpening_threshold_list + \
+                pp_gaussian_radius_list + \
+                pp_brightness_strength_list + \
+                pp_color_strength_list + \
+                pp_contrast_strength_list + \
+                pp_hue_strength_list + \
+                pp_bilateral_sigmaC_list + \
+                pp_bilateral_sigmaS_list + \
+                pp_color_tint_type_name_list + \
+                pp_color_tint_lut_name_list
 
         return ret
     
@@ -326,10 +494,12 @@ class Script(modules.scripts.Script):
                              dino_detection_cfg_list,
                              dino_detection_steps_list,
                              dino_detection_spliter_disable_list,
-                             dino_detection_spliter_remove_area_list):
+                             dino_detection_spliter_remove_area_list,
+                             dino_detection_clip_skip_list):
         for detect_index in range(dino_detect_count):
             self.change_ckpt_model(dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname)
             self.change_vae_model(dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae)
+            opts.CLIP_stop_at_last_layers = dino_detection_clip_skip_list[detect_index] if dino_detection_clip_skip_list[detect_index] else self.clip_skip
             if len(dino_detection_prompt_list[detect_index]) < 1: continue
             pi = I2I_Generator_Create(
                 p, ('Euler' if p.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p.sampler_name) if detailer_sample == 'Original' else detailer_sample,
@@ -384,8 +554,8 @@ class Script(modules.scripts.Script):
                                           suffix='' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
                                           info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                 p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
-                p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "original"
-                p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = processed.all_negative_prompts[0] if dino_detection_negative_list[detect_index] else "original"
+                p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = processed.all_prompts[0] if dino_detection_positive_list[detect_index] else "Original"
+                p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = processed.all_negative_prompts[0] if dino_detection_negative_list[detect_index] else "Original"
                 p.extra_generation_params[f'DINO {detect_index + 1} Denoising'] = pi.denoising_strength
                 p.extra_generation_params[f'DINO {detect_index + 1} CFG Scale'] = pi.cfg_scale
                 p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
@@ -393,17 +563,10 @@ class Script(modules.scripts.Script):
                 p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
                 p.extra_generation_params[f'DINO {detect_index + 1} Ckpt Model'] = dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname
                 p.extra_generation_params[f'DINO {detect_index + 1} Vae Model'] = dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae
+                p.extra_generation_params[f'DINO {detect_index + 1} Clip Skip'] = dino_detection_clip_skip_list[detect_index] if dino_detection_clip_skip_list[detect_index] else 'Original'
             else:
-                p.extra_generation_params[f'DINO {detect_index + 1}'] = dino_detection_prompt_list[detect_index]
-                p.extra_generation_params[f'DINO {detect_index + 1} Positive'] = "Error"
-                p.extra_generation_params[f'DINO {detect_index + 1} Negative'] = "Error"
-                p.extra_generation_params[f'DINO {detect_index + 1} Denoising'] = pi.denoising_strength
-                p.extra_generation_params[f'DINO {detect_index + 1} CFG Scale'] = pi.cfg_scale
-                p.extra_generation_params[f'DINO {detect_index + 1} Steps'] = pi.steps
-                p.extra_generation_params[f'DINO {detect_index + 1} Spliter'] = not dino_detection_spliter_disable_list[detect_index]
-                p.extra_generation_params[f'DINO {detect_index + 1} SplitRemove Area'] = dino_detection_spliter_remove_area_list[detect_index]
-                p.extra_generation_params[f'DINO {detect_index + 1} Ckpt Model'] = dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname
-                p.extra_generation_params[f'DINO {detect_index + 1} Vae Model'] = dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae
+                p.extra_generation_params[f'DINO {detect_index + 1}'] = 'Error'
+        opts.CLIP_stop_at_last_layers = self.clip_skip
         return init_image
     
     def upscale(self, p, init_image, 
@@ -487,13 +650,62 @@ class Script(modules.scripts.Script):
                                                 self.watermark_padding_list[water_index],
                                                 self.watermark_alpha_list[water_index])
         return init_image
+    
+    def postprocess_target(self, p, init_image, 
+                           pp_type_list,
+                           pp_saturation_strength_list,
+                           pp_sharpening_radius_list, pp_sharpening_percent_list, pp_sharpening_threshold_list,
+                           pp_gaussian_radius_list,
+                           pp_brightness_strength_list,
+                           pp_color_strength_list,
+                           pp_contrast_strength_list,
+                           pp_hue_strength_list,
+                           pp_bilateral_sigmaC_list, pp_bilateral_sigmaS_list,
+                           pp_color_tint_type_name_list,
+                           pp_color_tint_lut_name_list):
+        for pp_index in range(shared.opts.data.get('postprocessing_count', 1)):
+            if pp_type_list[pp_index] == 'none': continue
+            if shared.opts.data.get('save_ddsd_postprocessing_with_and_without', False):
+                images.save_image(init_image, p.outpath_samples, 
+                                shared.opts.data.get('save_ddsd_postprocessing_with_and_without_prefix', ''), 
+                                self.target_seeds, self.target_prompts, opts.samples_format, 
+                                suffix= '' if shared.opts.data.get('save_ddsd_postprocessing_with_and_without_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_postprocessing_with_and_without_suffix', '')}",
+                                info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+            init_image = ddsd_postprocess(init_image, pp_type_list[pp_index], pp_saturation_strength_list[pp_index], pp_sharpening_radius_list[pp_index], pp_sharpening_percent_list[pp_index], pp_sharpening_threshold_list[pp_index], pp_gaussian_radius_list[pp_index], pp_brightness_strength_list[pp_index], pp_color_strength_list[pp_index], pp_contrast_strength_list[pp_index], pp_hue_strength_list[pp_index], pp_bilateral_sigmaC_list[pp_index], pp_bilateral_sigmaS_list[pp_index], pp_color_tint_lut_name_list[pp_index], pp_color_tint_type_name_list[pp_index])
+            p.extra_generation_params[f'Postprocess {pp_index+1} type'] = pp_type_list[pp_index]
+            if pp_type_list[pp_index] == 'saturation': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} strength'] = pp_saturation_strength_list[pp_index]
+            elif pp_type_list[pp_index] == 'sharpening': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} radius'] = pp_sharpening_radius_list[pp_index]
+                p.extra_generation_params[f'Postprocess {pp_index+1} percent'] = pp_sharpening_percent_list[pp_index]
+                p.extra_generation_params[f'Postprocess {pp_index+1} threshold'] = pp_sharpening_threshold_list[pp_index]
+            elif pp_type_list[pp_index] == 'gaussian blur': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} radius'] = pp_gaussian_radius_list[pp_index]
+            elif pp_type_list[pp_index] == 'brightness': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} strength'] = pp_brightness_strength_list[pp_index]
+            elif pp_type_list[pp_index] == 'color': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} strength'] = pp_color_strength_list[pp_index]
+            elif pp_type_list[pp_index] == 'contrast': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} strength'] = pp_contrast_strength_list[pp_index]
+            elif pp_type_list[pp_index] == 'hue': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} strength'] = pp_hue_strength_list[pp_index]
+            elif pp_type_list[pp_index] == 'bilateral': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} sigma c'] = pp_bilateral_sigmaC_list[pp_index]
+                p.extra_generation_params[f'Postprocess {pp_index+1} sigma s'] = pp_bilateral_sigmaS_list[pp_index]
+            elif pp_type_list[pp_index] == 'color tint(type)': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} type'] = pp_color_tint_type_name_list[pp_index]
+            elif pp_type_list[pp_index] == 'color tint(lut)': 
+                p.extra_generation_params[f'Postprocess {pp_index+1} lut'] = pp_color_tint_lut_name_list[pp_index]
+        return init_image
 
     def change_vae_model(self, name:str):
+        if name is None: return
         if name.lower() in ['auto', 'automatic']: modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=modules.sd_vae.unspecified)
         elif name.lower() == 'none': modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=None)
         else: modules.sd_vae.reload_vae_weights(shared.sd_model, vae_file=modules.sd_vae.vae_dict[name])
     
     def change_ckpt_model(self, name:str):
+        if name is None: return
         info = modules.sd_models.get_closet_checkpoint_match(name)
         if info is None:
             raise RuntimeError(f"Unknown checkpoint: {name}")
@@ -503,10 +715,11 @@ class Script(modules.scripts.Script):
         if getattr(p, 'sub_processing', False): return
         self.change_ckpt_model(self.ckptname)
         self.change_vae_model(self.vae)
+        opts.CLIP_stop_at_last_layers = self.clip_skip
     
     def process(self, p,
             enable_script_names,
-            disable_watermark,
+            disable_watermark, disable_postprocess,
             disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength, upscaler_ckpt, upscaler_vae,
             disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
@@ -514,9 +727,11 @@ class Script(modules.scripts.Script):
         if getattr(p, 'sub_processing', False): return
         self.ckptname = ckpt_model_name_pattern.search(shared.opts.data['sd_model_checkpoint']).group(1)
         self.vae = shared.opts.data['sd_vae']
+        self.clip_skip = opts.CLIP_stop_at_last_layers
         self.restore_script(p)
         self.enable_script_names = enable_script_names
         self.disable_watermark = disable_watermark
+        self.disable_postprocess = disable_postprocess
         self.disable_upscaler = disable_upscaler
         self.ddetailer_before_upscaler = ddetailer_before_upscaler
         self.scalevalue = scalevalue
@@ -549,18 +764,34 @@ class Script(modules.scripts.Script):
         self.dino_detection_steps_list = args_list[self.dino_detect_count * 7:self.dino_detect_count * 8]
         self.dino_detection_spliter_disable_list = args_list[self.dino_detect_count * 8:self.dino_detect_count * 9]
         self.dino_detection_spliter_remove_area_list = args_list[self.dino_detect_count * 9:self.dino_detect_count * 10]
+        self.dino_detection_clip_skip_list = args_list[self.dino_detect_count * 10 : self.dino_detect_count * 11]
         self.watermark_count = shared.opts.data.get('watermark_count', 1)
-        self.watermark_type_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 0:self.dino_detect_count * 10 + self.watermark_count * 1]
-        self.watermark_position_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 1:self.dino_detect_count * 10 + self.watermark_count * 2]
-        self.watermark_image_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 2:self.dino_detect_count * 10 + self.watermark_count * 3]
-        self.watermark_image_size_width_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 3:self.dino_detect_count * 10 + self.watermark_count * 4]
-        self.watermark_image_size_height_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 4:self.dino_detect_count * 10 + self.watermark_count * 5]
-        self.watermark_text_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 5:self.dino_detect_count * 10 + self.watermark_count * 6]
-        self.watermark_text_color_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 6:self.dino_detect_count * 10 + self.watermark_count * 7]
-        self.watermark_text_font_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 7:self.dino_detect_count * 10 + self.watermark_count * 8]
-        self.watermark_text_size_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 8:self.dino_detect_count * 10 + self.watermark_count * 9]
-        self.watermark_padding_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 9:self.dino_detect_count * 10 + self.watermark_count * 10]
-        self.watermark_alpha_list = args_list[self.dino_detect_count * 10 + self.watermark_count * 10:self.dino_detect_count * 10 + self.watermark_count * 11]
+        self.watermark_type_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 0:self.dino_detect_count * 11 + self.watermark_count * 1]
+        self.watermark_position_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 1:self.dino_detect_count * 11 + self.watermark_count * 2]
+        self.watermark_image_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 2:self.dino_detect_count * 11 + self.watermark_count * 3]
+        self.watermark_image_size_width_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 3:self.dino_detect_count * 11 + self.watermark_count * 4]
+        self.watermark_image_size_height_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 4:self.dino_detect_count * 11 + self.watermark_count * 5]
+        self.watermark_text_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 5:self.dino_detect_count * 11 + self.watermark_count * 6]
+        self.watermark_text_color_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 6:self.dino_detect_count * 11 + self.watermark_count * 7]
+        self.watermark_text_font_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 7:self.dino_detect_count * 11 + self.watermark_count * 8]
+        self.watermark_text_size_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 8:self.dino_detect_count * 11 + self.watermark_count * 9]
+        self.watermark_padding_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 9:self.dino_detect_count * 11 + self.watermark_count * 10]
+        self.watermark_alpha_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 10:self.dino_detect_count * 11 + self.watermark_count * 11]
+        self.pp_count = shared.opts.data.get('postprocessing_count', 1)
+        self.pp_type_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 0:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 1]
+        self.pp_saturation_strength_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 1:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 2]
+        self.pp_sharpening_radius_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 2:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 3]
+        self.pp_sharpening_percent_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 3:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 4]
+        self.pp_sharpening_threshold_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 4:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 5]
+        self.pp_gaussian_radius_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 5:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 6]
+        self.pp_brightness_strength_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 6:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 7]
+        self.pp_color_strength_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 7:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 8]
+        self.pp_contrast_strength_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 8:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 9]
+        self.pp_hue_strength_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 9:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 10]
+        self.pp_bilateral_sigmaC_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 10:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 11]
+        self.pp_bilateral_sigmaS_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 11:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 12]
+        self.pp_color_tint_type_name_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 12:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 13]
+        self.pp_color_tint_lut_name_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 13:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14]
         self.script_names_list = [x.strip()+'.py' for x in enable_script_names.split(';') if len(x) > 1]
         self.script_names_list += [os.path.basename(__file__)]
         self.i2i_scripts = [x for x in self.original_scripts if os.path.basename(x.filename) in self.script_names_list].copy()
@@ -618,7 +849,8 @@ class Script(modules.scripts.Script):
                                                      self.dino_detection_cfg_list,
                                                      self.dino_detection_steps_list,
                                                      self.dino_detection_spliter_disable_list,
-                                                     self.dino_detection_spliter_remove_area_list)
+                                                     self.dino_detection_spliter_remove_area_list,
+                                                     self.dino_detection_clip_skip_list)
         devices.torch_gc()
         
         if not self.ddetailer_before_upscaler and not self.disable_upscaler:
@@ -627,6 +859,25 @@ class Script(modules.scripts.Script):
                                         self.overlap, self.rewidth, self.reheight, self.denoising_strength,
                                         self.upscaler_ckpt, self.upscaler_vae,
                                         self.detailer_mask_blur, self.dino_full_res_inpaint, self.dino_inpaint_padding)
+        devices.torch_gc()
+        
+        if not self.disable_postprocess:
+            output_image = self.postprocess_target(p, output_image,
+                                                   self.pp_type_list,
+                                                   self.pp_saturation_strength_list,
+                                                   self.pp_sharpening_radius_list,
+                                                   self.pp_sharpening_percent_list,
+                                                   self.pp_sharpening_threshold_list,
+                                                   self.pp_gaussian_radius_list,
+                                                   self.pp_brightness_strength_list,
+                                                   self.pp_color_strength_list,
+                                                   self.pp_contrast_strength_list,
+                                                   self.pp_hue_strength_list,
+                                                   self.pp_bilateral_sigmaC_list,
+                                                   self.pp_bilateral_sigmaS_list,
+                                                   self.pp_color_tint_type_name_list,
+                                                   self.pp_color_tint_lut_name_list)
+        
         devices.torch_gc()
         
         if not self.disable_watermark:
@@ -655,12 +906,21 @@ def on_ui_settings():
     shared.opts.add_option("dino_detect_count", shared.OptionInfo(
         2, "Dino Detect Max Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
     
+    shared.opts.add_option("save_ddsd_postprocessing_with_and_without", shared.OptionInfo(
+        False, "Save with and without postprocessing ", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_postprocessing_with_and_without_prefix", shared.OptionInfo(
+        '', "Save with and without postprocesing prefix", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option("save_ddsd_postprocessing_with_and_without_suffix", shared.OptionInfo(
+        'Without_Postprocessing', "Save with and without postprocessing suffix", gr.Textbox, {"interactive": True}, section=section))
+    shared.opts.add_option("postprocessing_count", shared.OptionInfo(
+        1, "Postprocessing Count", gr.Slider, {"minimum": 1, "maximum": 5, "step": 1}, section=section))
+    
     shared.opts.add_option("save_ddsd_watermark_with_and_without", shared.OptionInfo(
         False, "Save with and without watermark ", gr.Checkbox, {"interactive": True}, section=section))
     shared.opts.add_option("save_ddsd_watermark_with_and_without_prefix", shared.OptionInfo(
         '', "Save with and without watermark prefix", gr.Textbox, {"interactive": True}, section=section))
     shared.opts.add_option("save_ddsd_watermark_with_and_without_suffix", shared.OptionInfo(
-        'Without', "Save with and without watermark suffix", gr.Textbox, {"interactive": True}, section=section))
+        'Without_Watermark', "Save with and without watermark suffix", gr.Textbox, {"interactive": True}, section=section))
     shared.opts.add_option("watermark_count", shared.OptionInfo(
         1, "Watermark Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
 

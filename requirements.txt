@@ -3,3 +3,4 @@ segment_anything
 groundingdino
 scipy
 scikit-image
+pillow_lut
