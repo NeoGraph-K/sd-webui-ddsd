@@ -72,8 +72,11 @@ req_file = os.path.join(current_dir, 'requirements.txt')
 
 with open(req_file) as file:
     for lib in file:
+        version = None
         lib = lib.strip()
         lib = 'skimage' if lib == 'scikit-image' else lib
+        if '==' in lib:
+            lib, version = [x.strip() for x in lib.split('==')]
         if not launch.is_installed(lib):
             if lib == 'pycocotools':
                 install_pycocotools()
@@ -90,6 +93,7 @@ with open(req_file) as file:
                     f'sd-webui-ddsd requirement: pillow_lut'
                 )
             else:
+                lib = lib if version is None else lib + '==' + version
                 launch.run_pip(
                     f'install {lib}',
                     f'sd-webui-ddsd requirement: {lib}'

@@ -25,6 +25,7 @@ from basicsr.utils.download_util import load_file_from_url
 grounding_models_path = os.path.join(models_path, "grounding")
 sam_models_path = os.path.join(models_path, "sam")
 lut_models_path = os.path.join(models_path, 'lut')
+yolo_models_path = os.path.join(models_path, 'yolo')
 ddsd_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),'config')
 
 ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\\\+\\(\\)]+)\\s*\\[.*\\]')
@@ -56,6 +57,12 @@ def list_models(model_path, filter):
         return models
         
 def startup():
+    if (len(list_models(yolo_models_path, '.pth')) == 0) and (len(list_models(yolo_models_path, '.pt')) == 0):
+        print("No detection yolo models found, downloading...")
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt',yolo_models_path)
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8n.pt',yolo_models_path)
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8s.pt',yolo_models_path)
+        
     if (len(list_models(grounding_models_path, '.pth')) == 0):
         print("No detection groundingdino models found, downloading...")
         load_file_from_url('https://huggingface.co/ShilongLiu/GroundingDINO/resolve/main/groundingdino_swint_ogc.pth',grounding_models_path)
@@ -870,7 +877,8 @@ class Script(modules.scripts.Script):
         self.change_vae_model(self.vae)
         opts.CLIP_stop_at_last_layers = self.clip_skip
         if len(self.image_results) < 1: return
-        if p.n_iter > 1 or p.batch_size > 1:
+        final_count = len(res.images)
+        if (p.n_iter > 1 or p.batch_size > 1) and final_count != p.n_iter * p.batch_size:
             grid = res.images[0]
             res.images = res.images[1:]
             grid_texts = res.infotexts[0]
@@ -879,7 +887,7 @@ class Script(modules.scripts.Script):
         res.images = [image for sub in images for image in sub]
         infos = [[info] * (len(masks) + 1) for masks, info in zip(self.image_results, res.infotexts)]
         res.infotexts = [info for sub in infos for info in sub]
-        if p.n_iter > 1 or p.batch_size > 1:
+        if (p.n_iter > 1 or p.batch_size > 1) and final_count != p.n_iter * p.batch_size:
             res.images = [grid] + res.images
             res.infotexts = [grid_texts] + res.infotexts
     

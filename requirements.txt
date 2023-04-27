@@ -4,3 +4,5 @@ groundingdino
 scipy
 scikit-image
 pillow_lut
+ultralytics==8.0.87
+mediapipe==0.9.3.0
