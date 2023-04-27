@@ -1,8 +1,10 @@
+from json import load as json_read, dumps as json_write
 import os
 import math
 import re
 
 import gradio as gr
+import numpy as np
 from PIL import Image
 
 from scripts.ddsd_sam import sam_model_list
@@ -23,6 +25,7 @@ from basicsr.utils.download_util import load_file_from_url
 grounding_models_path = os.path.join(models_path, "grounding")
 sam_models_path = os.path.join(models_path, "sam")
 lut_models_path = os.path.join(models_path, 'lut')
+ddsd_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),'config')
 
 ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\\\+\\(\\)]+)\\s*\\[.*\\]')
 
@@ -119,6 +122,10 @@ startup()
 def gr_show(visible=True):
     return {"visible": visible, "__type__": "update"}
 
+def gr_list_refresh(choices, value):
+    return {'choices':choices,'value':value,'__type__':'update'}
+def gr_value_refresh(value):
+    return {'value':value,'__type__':'update'}
 class Script(modules.scripts.Script):
     def __init__(self):
         self.original_scripts = None
@@ -148,6 +155,7 @@ class Script(modules.scripts.Script):
         sample_list = [x for x in sample_list if x not in ['PLMS','UniPC','DDIM']]
         sample_list.insert(0,"Original")
         fonts_list, _ = get_fonts_list()
+        ddsd_config_list = [x[:-6] for x in os.listdir(ddsd_config_path) if x.endswith('.ddcfg')]
         ret = []
         dino_detection_ckpt_list = []
         dino_detection_vae_list = []
@@ -190,6 +198,13 @@ class Script(modules.scripts.Script):
         postprocess_tabs = None
         
         with gr.Accordion('DDSD', open=False, elem_id='ddsd_all_option_acc'):
+            
+            with gr.Row():
+                ddsd_save_path = gr.Textbox(label='Save File Name', visible=True, interactive=True, value='ddsd')
+                ddsd_save = gr.Button('Save', elem_id='save_button', visible=True, interactive=True)
+            with gr.Row():
+                ddsd_load_path = gr.Dropdown(label='Load File Name', visible=True, interactive=True, choices=ddsd_config_list)
+                ddsd_load = gr.Button('Load', elem_id='load_button',visible=True, interactive=True)
         
             with gr.Accordion("Script Option", open = False, elem_id="ddsd_enable_script_acc"):
                 with gr.Column():
@@ -479,6 +494,129 @@ class Script(modules.scripts.Script):
                 pp_color_tint_type_name_list + \
                 pp_color_tint_lut_name_list
 
+        def ds(*args):
+            args = list(args)
+            ddsd_save_path = args[0]
+            args = args[1:]
+            datas = args[:23]
+            datas[8] = shared.sd_upscalers[datas[8]].name
+            args = args[23:]
+            dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
+            datas.append(dino_detect_count)
+            datas.extend(args[dino_detect_count * 0:dino_detect_count * 11])
+            watermark_count = shared.opts.data.get('watermark_count', 1)
+            datas.append(watermark_count)
+            datas.extend(args[dino_detect_count * 11 + watermark_count * 0:dino_detect_count * 11 + watermark_count * 11])
+            images = [(index, None) for index, x in enumerate(datas) if isinstance(x, np.ndarray) or isinstance(x, Image.Image)]
+            for index, data in images:
+                datas[index] = data
+            pp_count = shared.opts.data.get('postprocessing_count', 1)
+            datas.append(pp_count)
+            datas.extend(args[dino_detect_count * 11 + watermark_count * 11 + pp_count * 0:dino_detect_count * 11 + watermark_count * 11 + pp_count * 14])
+            if not os.path.exists(ddsd_config_path):
+                os.mkdir(ddsd_config_path)
+            with open(os.path.join(ddsd_config_path, f'{ddsd_save_path}.ddcfg'), 'w', encoding='utf-8') as f:
+                f.write(json_write(dict(enumerate(datas))))
+            choices = [x[:-6] for x in os.listdir(ddsd_config_path) if x.endswith('.ddcfg')]
+            return {
+                ddsd_load_path:gr_list_refresh(choices, choices[0])
+            }
+        def dl(ddsd_load_path):
+            with open(os.path.join(ddsd_config_path, f'{ddsd_load_path}.ddcfg'), 'r', encoding='utf-8') as f:
+                json = json_read(f)
+            args = list(json.values())
+            results = args[:23]
+            args = args[23:]
+            dino_detect_file_count = args[0]
+            dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
+            args = args[1:]
+            def result_create(file_count,count,datas, default):
+                datas = datas[:file_count if file_count < count else count]
+                while len(datas) < count:
+                    datas.append(default)
+                return datas
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 'Original')
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 'Original')
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0.4)
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], True)
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 8)
+            args = args[dino_detect_file_count:]
+            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
+            args = args[dino_detect_file_count:]
+            watermark_file_count = args[0]
+            watermark_count = shared.opts.data.get('watermark_count', 1)
+            args = args[1:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Text')
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Center')
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], None)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 100)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 100)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], '')
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], None)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Arial')
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 50)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 10)
+            args = args[watermark_file_count:]
+            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 0.4)
+            args = args[watermark_file_count:]
+            pp_file_count = args[0]
+            pp_count = shared.opts.data.get('postprocessing_count', 1)
+            args = args[1:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'none')
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 2)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 100)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 2)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 0)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 10)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 10)
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'warm')
+            args = args[pp_file_count:]
+            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'FGCineBasic.cube')
+            args = args[pp_file_count:]
+            return dict(zip(ret, [gr_value_refresh(x) for x in results]))
+        ddsd_save.click(ds, inputs=[ddsd_save_path]+ret, outputs=[ddsd_load_path])
+        ddsd_load.click(dl, inputs=[ddsd_load_path], outputs=ret)
+        
         return ret
     
     def dino_detect_detailer(self, p, init_image,
@@ -496,10 +634,13 @@ class Script(modules.scripts.Script):
                              dino_detection_spliter_disable_list,
                              dino_detection_spliter_remove_area_list,
                              dino_detection_clip_skip_list):
+        self.image_results.append([])
+        def mask_image_suffle(mask, image):
+            mask_image = Image.new("RGBA", mask.size, (255,255,255,0))
+            mask_image.paste(mask, mask=mask)
+            mask_image = Image.composite(mask, image, mask_image)
+            return Image.blend(image, mask_image, 0.5)
         for detect_index in range(dino_detect_count):
-            self.change_ckpt_model(dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname)
-            self.change_vae_model(dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae)
-            opts.CLIP_stop_at_last_layers = dino_detection_clip_skip_list[detect_index] if dino_detection_clip_skip_list[detect_index] else self.clip_skip
             if len(dino_detection_prompt_list[detect_index]) < 1: continue
             pi = I2I_Generator_Create(
                 p, ('Euler' if p.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p.sampler_name) if detailer_sample == 'Original' else detailer_sample,
@@ -513,6 +654,9 @@ class Script(modules.scripts.Script):
             )
             mask = dino_detect_from_prompt(dino_detection_prompt_list[detect_index], detailer_sam_model, detailer_dino_model, init_image, disable_mask_paint_mode or isinstance(p, StableDiffusionProcessingTxt2Img), inpaint_mask_mode, getattr(p,'image_mask',None))
             if mask is not None:
+                self.change_ckpt_model(dino_detection_ckpt_list[detect_index] if dino_detection_ckpt_list[detect_index] != 'Original' else self.ckptname)
+                self.change_vae_model(dino_detection_vae_list[detect_index] if dino_detection_vae_list[detect_index] != 'Original' else self.vae)
+                opts.CLIP_stop_at_last_layers = dino_detection_clip_skip_list[detect_index] if dino_detection_clip_skip_list[detect_index] else self.clip_skip
                 if not dino_detection_spliter_disable_list[detect_index]:
                     mask = mask_spliter_and_remover(mask, dino_detection_spliter_remove_area_list[detect_index])
                     for mask_index, mask_split in enumerate(mask):
@@ -520,12 +664,16 @@ class Script(modules.scripts.Script):
                         pi.init_images = [init_image]
                         pi.image_mask = Image.fromarray(mask_split)
                         if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                            images.save_image(pi.image_mask, p.outpath_samples, 
+                            images.save_image(mask_image_suffle(pi.image_mask, pi.init_images[0]), p.outpath_samples, 
                                           shared.opts.data.get('save_ddsd_working_on_dino_mask_images_prefix', ''), 
                                           pi.seed, self.target_prompts, opts.samples_format, 
                                           suffix='' if shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '')}",
                                           info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                         state.job_count += 1
+                        if shared.opts.data.get('preview_masks_images', False):
+                            shared.state.current_image = mask_image_suffle(pi.image_mask, pi.init_images[0])
+                        if shared.opts.data.get('result_masks', False):
+                            self.image_results[-1].append(mask_image_suffle(pi.image_mask, pi.init_images[0]))
                         processed = processing.process_images(pi)
                         init_image = processed.images[0]
                         if shared.opts.data.get('save_ddsd_working_on_images', False):
@@ -539,12 +687,16 @@ class Script(modules.scripts.Script):
                     pi.init_images = [init_image]
                     pi.image_mask = Image.fromarray(mask)
                     if shared.opts.data.get('save_ddsd_working_on_dino_mask_images', False):
-                        images.save_image(pi.image_mask, p.outpath_samples, 
+                        images.save_image(mask_image_suffle(pi.image_mask, pi.init_images[0]), p.outpath_samples, 
                                           shared.opts.data.get('save_ddsd_working_on_dino_mask_images_prefix', ''), 
                                           pi.seed, self.target_prompts, opts.samples_format, 
                                           suffix='' if shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_dino_mask_images_suffix', '')}",
                                           info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
                     state.job_count += 1
+                    if shared.opts.data.get('preview_masks_images', False):
+                        shared.state.current_image = mask_image_suffle(pi.image_mask, pi.init_images[0])
+                    if shared.opts.data.get('result_masks', False):
+                        self.image_results[-1].append(mask_image_suffle(pi.image_mask, pi.init_images[0]))
                     processed = processing.process_images(pi)
                     init_image = processed.images[0]
                     if shared.opts.data.get('save_ddsd_working_on_images', False):
@@ -716,6 +868,19 @@ class Script(modules.scripts.Script):
         self.change_ckpt_model(self.ckptname)
         self.change_vae_model(self.vae)
         opts.CLIP_stop_at_last_layers = self.clip_skip
+        if len(self.image_results) < 1: return
+        if p.n_iter > 1 or p.batch_size > 1:
+            grid = res.images[0]
+            res.images = res.images[1:]
+            grid_texts = res.infotexts[0]
+            res.infotexts = res.infotexts[1:]
+        images = [[*masks, image] for masks, image in zip(self.image_results,res.images)]
+        res.images = [image for sub in images for image in sub]
+        infos = [[info] * (len(masks) + 1) for masks, info in zip(self.image_results, res.infotexts)]
+        res.infotexts = [info for sub in infos for info in sub]
+        if p.n_iter > 1 or p.batch_size > 1:
+            res.images = [grid] + res.images
+            res.infotexts = [grid_texts] + res.infotexts
     
     def process(self, p,
             enable_script_names,
@@ -725,6 +890,7 @@ class Script(modules.scripts.Script):
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
             *args):
         if getattr(p, 'sub_processing', False): return
+        self.image_results = []
         self.ckptname = ckpt_model_name_pattern.search(shared.opts.data['sd_model_checkpoint']).group(1)
         self.vae = shared.opts.data['sd_vae']
         self.clip_skip = opts.CLIP_stop_at_last_layers
@@ -923,5 +1089,10 @@ def on_ui_settings():
         'Without_Watermark', "Save with and without watermark suffix", gr.Textbox, {"interactive": True}, section=section))
     shared.opts.add_option("watermark_count", shared.OptionInfo(
         1, "Watermark Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
+    
+    shared.opts.add_option("preview_masks_images", shared.OptionInfo(
+        False, "Show the working mask in preview.", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("result_masks", shared.OptionInfo(
+        False, "The mask result is output on the final output.", gr.Checkbox, {"interactive": True}, section=section))
 
 modules.script_callbacks.on_ui_settings(on_ui_settings)

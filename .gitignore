@@ -164,3 +164,7 @@ cython_debug/
 *.safetensors
 models/control_sd15_scribble.pth
 detected_maps/
+
+# Ignore all .ddcfg files except for Empty.ddcfg
+config/*.ddcfg
+!config/Empty.ddcfg
