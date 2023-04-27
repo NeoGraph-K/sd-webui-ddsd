@@ -636,6 +636,7 @@ class Script(modules.scripts.Script):
                              dino_detection_clip_skip_list):
         self.image_results.append([])
         def mask_image_suffle(mask, image):
+            if shared.opts.data.get('mask_type', False): return mask
             mask_image = Image.new("RGBA", mask.size, (255,255,255,0))
             mask_image.paste(mask, mask=mask)
             mask_image = Image.composite(mask, image, mask_image)
@@ -1094,5 +1095,7 @@ def on_ui_settings():
         False, "Show the working mask in preview.", gr.Checkbox, {"interactive": True}, section=section))
     shared.opts.add_option("result_masks", shared.OptionInfo(
         False, "The mask result is output on the final output.", gr.Checkbox, {"interactive": True}, section=section))
+    shared.opts.add_option("mask_type", shared.OptionInfo(
+        False, "The type of mask is a black and white image.", gr.Checkbox, {"interactive": True}, section=section))
 
 modules.script_callbacks.on_ui_settings(on_ui_settings)
