@@ -28,7 +28,7 @@ lut_models_path = os.path.join(models_path, 'lut')
 yolo_models_path = os.path.join(models_path, 'yolo')
 ddsd_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),'config')
 
-ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\\\+\\(\\)]+)\\s*\\[.*\\]')
+ckpt_model_name_pattern = re.compile('([\\w\\.\\[\\]\\\\\\+\\(\\)/]+)\\s*\\[.*\\]')
 
 def list_models(model_path, filter):
         model_list = modelloader.load_models(model_path=model_path, ext_filter=[filter])
@@ -902,7 +902,7 @@ class Script(modules.scripts.Script):
             *args):
         if getattr(p, 'sub_processing', False): return
         self.image_results = []
-        self.ckptname = ckpt_model_name_pattern.search(shared.opts.data['sd_model_checkpoint']).group(1)
+        self.ckptname = shared.opts.data['sd_model_checkpoint']
         self.vae = shared.opts.data['sd_vae']
         self.clip_skip = opts.CLIP_stop_at_last_layers
         self.restore_script(p)
