@@ -79,50 +79,50 @@ def startup():
         
     if (len(list_models(lut_models_path, '.cube')) == 0): # Free use lut files.
         print('No detection lut models found, downloading...')
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Arabica%2012.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Ava%20614.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Azrael%2093.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Bourbon%2064.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Byers%2011.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Chemical%20168.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Clayton%2033.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Clouseau%2054.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Cobi%203.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Contrail%2035.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Cubicle%2099.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Django%2025.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Domingo%20145.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineBasic.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineBright.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineCold.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineDrama.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineTealOrange1.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineTealOrange2.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineVibrant.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/FGCineWarm.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Faded%2047.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Folger%2050.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Fusion%2088.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Hyla%2068.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Korben%20214.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/LBK-K-Tone_33.cube', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Lenox%20340.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Lucky%2064.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/McKinnon%2075.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Milo%205.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Neon%20770.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Paladin%201875.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Pasadena%2021.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Pitaya%2015.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Reeve%2038.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Remy%2024.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Sprocket%20231.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Teigen%2028.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Trent%2018.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Tweed%2071.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Vireo%2037.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Zed%2032.CUBE', lut_models_path)
-        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/blob/main/Zeke%2039.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Arabica%2012.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Ava%20614.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Azrael%2093.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Bourbon%2064.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Byers%2011.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Chemical%20168.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Clayton%2033.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Clouseau%2054.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Cobi%203.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Contrail%2035.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Cubicle%2099.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Django%2025.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Domingo%20145.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineBasic.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineBright.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineCold.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineDrama.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineTealOrange1.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineTealOrange2.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineVibrant.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/FGCineWarm.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Faded%2047.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Folger%2050.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Fusion%2088.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Hyla%2068.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Korben%20214.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/LBK-K-Tone_33.cube', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Lenox%20340.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Lucky%2064.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/McKinnon%2075.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Milo%205.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Neon%20770.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Paladin%201875.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Pasadena%2021.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Pitaya%2015.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Reeve%2038.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Remy%2024.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Sprocket%20231.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Teigen%2028.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Trent%2018.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Tweed%2071.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Vireo%2037.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Zed%2032.CUBE', lut_models_path)
+        load_file_from_url('https://huggingface.co/datasets/NeoGraph/Luts_Cube/resolve/main/Zeke%2039.CUBE', lut_models_path)
 
 startup()
 
@@ -232,8 +232,8 @@ class Script(modules.scripts.Script):
                     scalevalue = gr.Slider(minimum=1, maximum=16, step=0.5, elem_id='upscaler_scalevalue', label='Resize', value=2, visible=False)
                     overlap = gr.Slider(minimum=0, maximum=256, step=32, elem_id='upscaler_overlap', label='Tile overlap', value=32, visible=False)
                     with gr.Row():
-                        rewidth = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_rewidth', label='Width', value=512, visible=False)
-                        reheight = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_reheight', label='Height', value=512, visible=False)
+                        rewidth = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_rewidth', label='Width(0 to No Inpainting)', value=512, visible=False)
+                        reheight = gr.Slider(minimum=0, maximum=1024, step=64, elem_id='upscaler_reheight', label='Height(0 to No Inpainting)', value=512, visible=False)
                     denoising_strength = gr.Slider(minimum=0, maximum=1.0, step=0.01, elem_id='upscaler_denoising', label='Denoising strength', value=0.1, visible=False)
         
             with gr.Accordion("DINO Detect", open=False, elem_id="ddsd_dino_detect_acc"):
@@ -752,35 +752,37 @@ class Script(modules.scripts.Script):
             img = self.upscaler.scaler.upscale(init_image, scalevalue, self.upscaler.data_path)
         else:
             img = init_image
+        if rewidth and reheight:
+            devices.torch_gc()
+            grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
+            work = []
+            for y, h, row in grid.tiles:
+                for tiledata in row:
+                    work.append(tiledata[2])
 
-        devices.torch_gc()
-        grid = images.split_grid(img, tile_w=rewidth, tile_h=reheight, overlap=overlap)
-        work = []
-        for y, h, row in grid.tiles:
-            for tiledata in row:
-                work.append(tiledata[2])
+            batch_count = math.ceil(len(work))
+            state.job = 'Upscaler Batching'
+            state.job_count += batch_count
 
-        batch_count = math.ceil(len(work))
-        state.job = 'Upscaler Batching'
-        state.job_count += batch_count
+            print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
+            
+            pi.seed = self.target_seeds
+            work_results = []
+            for i in range(batch_count):
+                pi.init_images = work[i:(i+1)]
+                processed = processing.process_images(pi)
 
-        print(f"Tile upscaling will process a total of {len(work)} images tiled as {len(grid.tiles[0][2])}x{len(grid.tiles)} per upscale in a total of {state.job_count} batches (I2I).")
-        
-        pi.seed = self.target_seeds
-        work_results = []
-        for i in range(batch_count):
-            pi.init_images = work[i:(i+1)]
-            processed = processing.process_images(pi)
+                p.seed = processed.seed + 1
+                work_results += processed.images
 
-            p.seed = processed.seed + 1
-            work_results += processed.images
-
-        image_index = 0
-        for y, h, row in grid.tiles:
-            for tiledata in row:
-                tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
-                image_index += 1
-        init_image = images.combine_grid(grid)
+            image_index = 0
+            for y, h, row in grid.tiles:
+                for tiledata in row:
+                    tiledata[2] = work_results[image_index] if image_index < len(work_results) else Image.new("RGB", (rewidth, reheight))
+                    image_index += 1
+            init_image = images.combine_grid(grid)
+        else:
+            init_image = img
         if shared.opts.data.get('save_ddsd_working_on_images', False):
             images.save_image(init_image, p.outpath_samples, 
                               shared.opts.data.get('save_ddsd_working_on_images_prefix', ''), 

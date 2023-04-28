@@ -55,7 +55,6 @@ def create_mask_from_bbox(image, bboxes):
     return np.array(mask)
         
 def bs_model(image, model_type, confidence):
-    print(model_type, confidence)
     image = Image.fromarray(image)
     orig = torch.load
     torch.load = safe.unsafe_torch_load
