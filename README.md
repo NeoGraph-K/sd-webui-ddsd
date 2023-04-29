@@ -70,6 +70,7 @@
 
 ### Video
 <iframe width="1237" height="696" src="https://www.youtube.com/embed/9wfZyJhPPho" title="Stable Diffusion - DDSD 확장 기능  (No - Talking)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
 ## Installation
 1. 다운로드 [CUDA](https://developer.nvidia.com/cuda-toolkit-archive)와 [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
     1. 자신이 가진 WebUI와 동일한 버전의 `CUDA`와 `cuDNN`버전으로 설치
