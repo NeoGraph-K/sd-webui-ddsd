@@ -505,121 +505,134 @@ class Script(modules.scripts.Script):
             args = list(args)
             ddsd_save_path = args[0]
             args = args[1:]
-            datas = args[:23]
-            datas[8] = shared.sd_upscalers[datas[8]].name
+            enable_script_names,disable_watermark,disable_postprocess,disable_upscaler,ddetailer_before_upscaler,scalevalue,upscaler_sample,overlap,upscaler_index,rewidth,reheight,denoising_strength,upscaler_ckpt,upscaler_vae,disable_detailer,disable_mask_paint_mode,inpaint_mask_mode,detailer_sample,detailer_sam_model,detailer_dino_model,dino_full_res_inpaint,dino_inpaint_padding,detailer_mask_blur = args[:23]
+            result = {}
+            result['enable_script_names'] = enable_script_names
+            result['disable_watermark'] = disable_watermark
+            result['disable_postprocess'] = disable_postprocess
+            result['disable_upscaler'] = disable_upscaler
+            result['ddetailer_before_upscaler'] = ddetailer_before_upscaler
+            result['scalevalue'] = scalevalue
+            result['upscaler_sample'] = upscaler_sample
+            result['overlap'] = overlap
+            result['upscaler_index'] = shared.sd_upscalers[upscaler_index].name
+            result['rewidth'] = rewidth
+            result['reheight'] = reheight
+            result['denoising_strength'] = denoising_strength
+            result['upscaler_ckpt'] = upscaler_ckpt
+            result['upscaler_vae'] = upscaler_vae
+            result['disable_detailer'] = disable_detailer
+            result['disable_mask_paint_mode'] = disable_mask_paint_mode
+            result['inpaint_mask_mode'] = inpaint_mask_mode
+            result['detailer_sample'] = detailer_sample
+            result['detailer_sam_model'] = detailer_sam_model
+            result['detailer_dino_model'] = detailer_dino_model
+            result['dino_full_res_inpaint'] = dino_full_res_inpaint
+            result['dino_inpaint_padding'] = dino_inpaint_padding
+            result['detailer_mask_blur'] = detailer_mask_blur
             args = args[23:]
-            dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
-            datas.append(dino_detect_count)
-            datas.extend(args[dino_detect_count * 0:dino_detect_count * 11])
-            watermark_count = shared.opts.data.get('watermark_count', 1)
-            datas.append(watermark_count)
-            datas.extend(args[dino_detect_count * 11 + watermark_count * 0:dino_detect_count * 11 + watermark_count * 11])
-            images = [(index, None) for index, x in enumerate(datas) if isinstance(x, np.ndarray) or isinstance(x, Image.Image)]
-            for index, data in images:
-                datas[index] = data
-            pp_count = shared.opts.data.get('postprocessing_count', 1)
-            datas.append(pp_count)
-            datas.extend(args[dino_detect_count * 11 + watermark_count * 11 + pp_count * 0:dino_detect_count * 11 + watermark_count * 11 + pp_count * 14])
+            result['dino_detect_count'] = shared.opts.data.get('dino_detect_count', 2)
+            for index in range(result['dino_detect_count']):
+                result[f'dino_detection_ckpt_{index+1}'] = args[index + result['dino_detect_count'] * 0]
+                result[f'dino_detection_vae_{index+1}'] = args[index + result['dino_detect_count'] * 1]
+                result[f'dino_detection_prompt_{index+1}'] = args[index + result['dino_detect_count'] * 2]
+                result[f'dino_detection_positive_{index+1}'] = args[index + result['dino_detect_count'] * 3]
+                result[f'dino_detection_negative_{index+1}'] = args[index + result['dino_detect_count'] * 4]
+                result[f'dino_detection_denoise_{index+1}'] = args[index + result['dino_detect_count'] * 5]
+                result[f'dino_detection_cfg_{index+1}'] = args[index + result['dino_detect_count'] * 6]
+                result[f'dino_detection_steps_{index+1}'] = args[index + result['dino_detect_count'] * 7]
+                result[f'dino_detection_spliter_disable_{index+1}'] = args[index + result['dino_detect_count'] * 8]
+                result[f'dino_detection_spliter_remove_area_{index+1}'] = args[index + result['dino_detect_count'] * 9]
+                result[f'dino_detection_clip_skip_{index+1}'] = args[index + result['dino_detect_count'] * 10]
+            args = args[result['dino_detect_count'] * 11:]
+            result['watermark_count'] = shared.opts.data.get('watermark_count', 1)
+            for index in range(result['watermark_count']):
+                result[f'watermark_type_{index+1}'] = args[index + result['watermark_count'] * 0]
+                result[f'watermark_position_{index+1}'] = args[index + result['watermark_count'] * 1]
+                result[f'watermark_image_{index+1}'] = None
+                result[f'watermark_image_size_width_{index+1}'] = args[index + result['watermark_count'] * 3]
+                result[f'watermark_image_size_height_{index+1}'] = args[index + result['watermark_count'] * 4]
+                result[f'watermark_text_{index+1}'] = args[index + result['watermark_count'] * 5]
+                result[f'watermark_text_color_{index+1}'] = args[index + result['watermark_count'] * 6]
+                result[f'watermark_text_font_{index+1}'] = args[index + result['watermark_count'] * 7]
+                result[f'watermark_text_size_{index+1}'] = args[index + result['watermark_count'] * 8]
+                result[f'watermark_padding_{index+1}'] = args[index + result['watermark_count'] * 9]
+                result[f'watermark_alpha_{index+1}'] = args[index + result['watermark_count'] * 10]
+            args = args[result['watermark_count'] * 11:]
+            result['postprocessing_count'] = shared.opts.data.get('postprocessing_count', 1)
+            for index in range(result['postprocessing_count']):
+                result[f'pp_type_{index+1}'] = args[index + result['postprocessing_count'] * 0]
+                result[f'pp_saturation_strength_{index+1}'] = args[index + result['postprocessing_count'] * 1]
+                result[f'pp_sharpening_radius_{index+1}'] = args[index + result['postprocessing_count'] * 2]
+                result[f'pp_sharpening_percent_{index+1}'] = args[index + result['postprocessing_count'] * 3]
+                result[f'pp_sharpening_threshold_{index+1}'] = args[index + result['postprocessing_count'] * 4]
+                result[f'pp_gaussian_radius_{index+1}'] = args[index + result['postprocessing_count'] * 5]
+                result[f'pp_brightness_strength_{index+1}'] = args[index + result['postprocessing_count'] * 6]
+                result[f'pp_color_strength_{index+1}'] = args[index + result['postprocessing_count'] * 7]
+                result[f'pp_contrast_strength_{index+1}'] = args[index + result['postprocessing_count'] * 8]
+                result[f'pp_hue_strength_{index+1}'] = args[index + result['postprocessing_count'] * 9]
+                result[f'pp_bilateral_sigmaC_{index+1}'] = args[index + result['postprocessing_count'] * 10]
+                result[f'pp_bilateral_sigmaS_{index+1}'] = args[index + result['postprocessing_count'] * 11]
+                result[f'pp_color_tint_type_name_{index+1}'] = args[index + result['postprocessing_count'] * 12]
+                result[f'pp_color_tint_lut_name_{index+1}'] = args[index + result['postprocessing_count'] * 13]
             if not os.path.exists(ddsd_config_path):
                 os.mkdir(ddsd_config_path)
             with open(os.path.join(ddsd_config_path, f'{ddsd_save_path}.ddcfg'), 'w', encoding='utf-8') as f:
-                f.write(json_write(dict(enumerate(datas))))
+                f.write(json_write(result))
             choices = [x[:-6] for x in os.listdir(ddsd_config_path) if x.endswith('.ddcfg')]
             return {
                 ddsd_load_path:gr_list_refresh(choices, choices[0])
             }
         def dl(ddsd_load_path):
             with open(os.path.join(ddsd_config_path, f'{ddsd_load_path}.ddcfg'), 'r', encoding='utf-8') as f:
-                json = json_read(f)
-            args = list(json.values())
-            results = args[:23]
-            args = args[23:]
-            dino_detect_file_count = args[0]
-            dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
-            args = args[1:]
-            def result_create(file_count,count,datas, default):
-                datas = datas[:file_count if file_count < count else count]
-                while len(datas) < count:
-                    datas.append(default)
-                return datas
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 'Original')
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 'Original')
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], '')
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0.4)
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], True)
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 8)
-            args = args[dino_detect_file_count:]
-            results += result_create(dino_detect_file_count, dino_detect_count, args[:dino_detect_file_count], 0)
-            args = args[dino_detect_file_count:]
-            watermark_file_count = args[0]
-            watermark_count = shared.opts.data.get('watermark_count', 1)
-            args = args[1:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Text')
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Center')
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], None)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 100)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 100)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], '')
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], None)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 'Arial')
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 50)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 10)
-            args = args[watermark_file_count:]
-            results += result_create(watermark_file_count, watermark_count, args[:watermark_file_count], 0.4)
-            args = args[watermark_file_count:]
-            pp_file_count = args[0]
-            pp_count = shared.opts.data.get('postprocessing_count', 1)
-            args = args[1:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'none')
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 2)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 100)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 2)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 1.1)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 0)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 10)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 10)
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'warm')
-            args = args[pp_file_count:]
-            results += result_create(pp_file_count, pp_count, args[:pp_file_count], 'FGCineBasic.cube')
-            args = args[pp_file_count:]
+                result = json_read(f)
+            results = [result['enable_script_names'],result['disable_watermark'],result['disable_postprocess'],result['disable_upscaler'],result['ddetailer_before_upscaler'],result['scalevalue'],result['upscaler_sample'],result['overlap'],result['upscaler_index'],result['rewidth'],result['reheight'],result['denoising_strength'],result['upscaler_ckpt'],result['upscaler_vae'],result['disable_detailer'],result['disable_mask_paint_mode'],result['inpaint_mask_mode'],result['detailer_sample'],result['detailer_sam_model'],result['detailer_dino_model'],result['dino_full_res_inpaint'],result['dino_inpaint_padding'],result['detailer_mask_blur']]
+            def result_create(token,file_count,count, default):
+                data = file_count if file_count < count else count
+                temp = []
+                for index in range(data):
+                    temp.append(result.get(f'{token}_{index+1}',default))
+                while len(temp) < count:
+                    temp.append(default)
+                return temp
+            results += result_create('dino_detection_ckpt',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 'Original')
+            results += result_create('dino_detection_vae',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 'Original')
+            results += result_create('dino_detection_prompt',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), '')
+            results += result_create('dino_detection_positive',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), '')
+            results += result_create('dino_detection_negative',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), '')
+            results += result_create('dino_detection_denoise',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 0.4)
+            results += result_create('dino_detection_cfg',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 0)
+            results += result_create('dino_detection_steps',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 0)
+            results += result_create('dino_detection_spliter_disable',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), True)
+            results += result_create('dino_detection_spliter_remove_area',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 8)
+            results += result_create('dino_detection_clip_skip',result['dino_detect_count'], shared.opts.data.get('dino_detect_count', 2), 0)
+            
+            results += result_create('watermark_type',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 'Text')
+            results += result_create('watermark_position',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 'Center')
+            results += result_create('watermark_image',result['watermark_count'], shared.opts.data.get('watermark_count', 1), None)
+            results += result_create('watermark_image_size_width',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 100)
+            results += result_create('watermark_image_size_height',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 100)
+            results += result_create('watermark_text',result['watermark_count'], shared.opts.data.get('watermark_count', 1), '')
+            results += result_create('watermark_text_color',result['watermark_count'], shared.opts.data.get('watermark_count', 1), None)
+            results += result_create('watermark_text_font',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 'Arial')
+            results += result_create('watermark_text_size',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 50)
+            results += result_create('watermark_padding',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 10)
+            results += result_create('watermark_alpha',result['watermark_count'], shared.opts.data.get('watermark_count', 1), 0.4)
+            
+            results += result_create('pp_type',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 'none')
+            results += result_create('pp_saturation_strength',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 1.1)
+            results += result_create('pp_sharpening_radius',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 2)
+            results += result_create('pp_sharpening_percent',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 100)
+            results += result_create('pp_sharpening_threshold',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 1)
+            results += result_create('pp_gaussian_radius',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 2)
+            results += result_create('pp_brightness_strength',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 1.1)
+            results += result_create('pp_color_strength',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 1.1)
+            results += result_create('pp_contrast_strength',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 1.1)
+            results += result_create('pp_hue_strength',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 0)
+            results += result_create('pp_bilateral_sigmaC',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 10)
+            results += result_create('pp_bilateral_sigmaS',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 10)
+            results += result_create('pp_color_tint_type_name',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 'warm')
+            results += result_create('pp_color_tint_lut_name',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 'FGCineBasic.cube')
             return dict(zip(ret, [gr_value_refresh(x) for x in results]))
         ddsd_save.click(ds, inputs=[ddsd_save_path]+ret, outputs=[ddsd_load_path])
         ddsd_load.click(dl, inputs=[ddsd_load_path], outputs=ret)
