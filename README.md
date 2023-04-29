@@ -69,7 +69,7 @@
 6. 생성!
 
 ### Video
-[![Stable Diffusion - DDSD 확장 기능  (No - Talking)](https://i.ytimg.com/vi/9wfZyJhPPho/hqdefault.jpg)](<iframe width="1237" height="696" src="https://www.youtube.com/embed/9wfZyJhPPho" title="Stable Diffusion - DDSD 확장 기능  (No - Talking)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>)
+[Stable Diffusion - DDSD 확장 기능  (No - Talking)](<iframe width="1237" height="696" src="https://www.youtube.com/embed/9wfZyJhPPho" title="Stable Diffusion - DDSD 확장 기능  (No - Talking)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>)
 
 ## Installation
 1. 다운로드 [CUDA](https://developer.nvidia.com/cuda-toolkit-archive)와 [cuDNN](https://developer.nvidia.com/rdp/cudnn-archive)
