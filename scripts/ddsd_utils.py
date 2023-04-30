@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 from scripts.ddsd_sam import sam_predict, clear_cache, dilate_mask
 from scripts.ddsd_bs import bs_model
 from modules.devices import torch_gc
-from skimage import measure
+from skimage import measure, exposure
 
 from modules.paths import models_path
 from modules.processing import StableDiffusionProcessingImg2Img
@@ -188,14 +188,14 @@ def mask_spliter_and_remover(mask, area):
         label_images.append(label_image)
     return label_images
     
-def I2I_Generator_Create(p, i2i_sample, i2i_mask_blur, full_res_inpainting, inpainting_padding, init_image, denoise, cfg, steps, width, height, tiling, scripts, scripts_list, alwaysonscripts_list, script_args, positive, negative):
+def I2I_Generator_Create(p, i2i_sample, i2i_mask_blur, full_res_inpainting, inpainting_padding, init_image, denoise, cfg, steps, width, height, tiling, scripts, scripts_list, alwaysonscripts_list, script_args, positive, negative, fill = 1):
     i2i = StableDiffusionProcessingImg2Img(
                 init_images = [init_image],
                 resize_mode = 0,
                 denoising_strength = 0,
                 mask = None,
                 mask_blur= i2i_mask_blur,
-                inpainting_fill = 1,
+                inpainting_fill = fill,
                 inpaint_full_res = full_res_inpainting,
                 inpaint_full_res_padding= inpainting_padding,
                 inpainting_mask_invert= 0,
@@ -290,3 +290,94 @@ def image_apply_watermark(image, watermark_type, watermark_position, watermark_i
     gc.collect()
     torch_gc()
     return result
+
+def matched_noise(image_np, mask_np, noise = 1, color_variation = 0.05):
+    def _fft2(data):
+        if data.ndim > 2:
+            out_fft = np.zeros((data.shape[0], data.shape[1], data.shape[2]), dtype=np.complex128)
+            for c in range(data.shape[2]):
+                c_data = data[:,:,c]
+                out_fft[:,:,c] = np.fft.fft2(np.fft.fftshift(c_data), norm='ortho')
+                out_fft[:,:,c] = np.fft.ifftshift(out_fft[:,:,c])
+        else:
+            out_fft = np.zeros((data.shape[0], data.shape[1]), dtype=np.complex128)
+            out_fft[:,:] = np.fft.fft2(np.fft.fftshift(data), norm='ortho')
+            out_fft[:,:] = np.fft.ifftshift(out_fft[:,:])
+        return out_fft
+    def _ifft2(data):
+        if data.ndim > 2:
+            out_ifft = np.zeros((data.shape[0], data.shape[1], data.shape[2]), dtype=np.complex128)
+            for c in range(data.shape[2]):
+                c_data = data[:, :, c]
+                out_ifft[:, :, c] = np.fft.ifft2(np.fft.fftshift(c_data), norm="ortho")
+                out_ifft[:, :, c] = np.fft.ifftshift(out_ifft[:, :, c])
+        else:
+            out_ifft = np.zeros((data.shape[0], data.shape[1]), dtype=np.complex128)
+            out_ifft[:, :] = np.fft.ifft2(np.fft.fftshift(data), norm="ortho")
+            out_ifft[:, :] = np.fft.ifftshift(out_ifft[:, :])
+        return out_ifft
+    def _get_gaussian_window(width, height, std=3.14, mode=0):
+        window_scale_x = float(width / min(width, height))
+        window_scale_y = float(height / min(width, height))
+        window = np.zeros((width, height))
+        x = (np.arange(width) / width * 2. - 1.) * window_scale_x
+        for y in range(height):
+            fy = (y / height * 2. - 1.) * window_scale_y
+            if mode == 0:
+                window[:, y] = np.exp(-(x ** 2 + fy ** 2) * std)
+            else:
+                window[:, y] = (1 / ((x ** 2 + 1.) * (fy ** 2 + 1.))) ** (std / 3.14)
+        return window
+    def _get_masked_window_rgb(np_mask_grey, hardness=1.0):
+        np_mask_rgb = np.zeros((np_mask_grey.shape[0], np_mask_grey.shape[1], 3))
+        if hardness != 1.0:
+            hardened = np_mask_grey[:] ** hardness
+        else:
+            hardened = np_mask_grey[:]
+        for c in range(3):
+            np_mask_rgb[:, :, c] = hardened[:]
+        return np_mask_rgb
+    
+    width  = image_np.shape[0]
+    height = image_np.shape[1]
+    channel = image_np.shape[2]
+    
+    image_np = image_np[:] * (1.0 - mask_np)
+    mask_np_grey = (np.sum(mask_np, axis=2) / 3.0)
+    img_mask = mask_np_grey > 1e-6
+    ref_mask = mask_np_grey < 1e-3
+    
+    image_windowed = image_np * (1.0 - _get_masked_window_rgb(mask_np_grey))
+    image_windowed /= np.max(image_windowed)
+    image_windowed += np.average(image_np) * mask_np
+    
+    src_fft = _fft2(image_windowed)
+    src_dist = np.absolute(src_fft)
+    src_phase = src_fft / src_dist
+    
+    rng = np.random.default_rng(0)
+    
+    noise_window = _get_gaussian_window(width, height, mode=1)
+    noise_rgb = rng.random((width,height, channel))
+    noise_grey = (np.sum(noise_rgb, axis=2) / 3.0)
+    noise_rgb *= color_variation
+    for c in range(channel):
+        noise_rgb[:,:,c] += (1.0 - color_variation) * noise_grey
+    
+    noise_fft = _fft2(noise_rgb)
+    for c in range(channel):
+        noise_fft[:,:,c] *= noise_window
+    noise_rgb = np.real(_ifft2(noise_fft))
+    shaped_noise_fft = _fft2(noise_rgb)
+    shaped_noise_fft[:,:,:] = np.absolute(shaped_noise_fft[:,:,:]) ** 2 * (src_dist ** noise) * src_phase
+    
+    brightness_variation = 0
+    contrast_adjusted_np = image_np[:] * (brightness_variation + 1.0) - brightness_variation * 2.0
+    
+    shaped_noise = np.real(_ifft2(shaped_noise_fft))
+    shaped_noise -= np.min(shaped_noise)
+    shaped_noise /= np.max(shaped_noise)
+    shaped_noise[img_mask, :] = exposure.match_histograms(shaped_noise[img_mask, :] ** 1.0, contrast_adjusted_np[ref_mask, :], channel_axis = 1)
+    shaped_noise = image_np[:] * (1.0 - mask_np) + shaped_noise * mask_np
+    
+    return np.clip(shaped_noise[:], 0.0, 1.0)

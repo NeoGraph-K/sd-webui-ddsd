@@ -5,12 +5,12 @@ import re
 
 import gradio as gr
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from scripts.ddsd_sam import sam_model_list
 from scripts.ddsd_dino import dino_model_list
 from scripts.ddsd_postprocess import lut_model_list, ddsd_postprocess
-from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create, get_fonts_list, image_apply_watermark
+from scripts.ddsd_utils import dino_detect_from_prompt, mask_spliter_and_remover, I2I_Generator_Create, get_fonts_list, image_apply_watermark, matched_noise
 
 import modules
 from modules import processing, shared, images, devices, modelloader, sd_models, sd_vae
@@ -62,6 +62,9 @@ def startup():
         load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt',yolo_models_path)
         load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8n.pt',yolo_models_path)
         load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8s.pt',yolo_models_path)
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8n_v2.pt',yolo_models_path)
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt',yolo_models_path)
+        load_file_from_url('https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8s.pt',yolo_models_path)
         
     if (len(list_models(grounding_models_path, '.pth')) == 0):
         print("No detection groundingdino models found, downloading...")
@@ -200,9 +203,17 @@ class Script(modules.scripts.Script):
         watermark_text_size_list = []
         watermark_padding_list = []
         watermark_alpha_list = []
+        outpaint_positive_list = []
+        outpaint_negative_list = []
+        outpaint_denoise_list = []
+        outpaint_cfg_list = []
+        outpaint_steps_list = []
+        outpaint_pixels_list = []
+        outpaint_direction_list = []
         dino_tabs = None
         watermark_tabs = None
         postprocess_tabs = None
+        outpaint_tabs = None
         
         with gr.Accordion('DDSD', open=False, elem_id='ddsd_all_option_acc'):
             
@@ -212,11 +223,37 @@ class Script(modules.scripts.Script):
             with gr.Row():
                 ddsd_load_path = gr.Dropdown(label='Load File Name', visible=True, interactive=True, choices=ddsd_config_list)
                 ddsd_load = gr.Button('Load', elem_id='load_button',visible=True, interactive=True)
-        
+
             with gr.Accordion("Script Option", open = False, elem_id="ddsd_enable_script_acc"):
                 with gr.Column():
                     all_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I All process target script</p>')
                     enable_script_names = gr.Textbox(label="Enable Script(Extension)", elem_id="enable_script_names", value='dynamic_thresholding;dynamic_prompting',show_label=True, lines=1, placeholder="Extension python file name(ex - dynamic_thresholding;dynamic_prompting)")
+            
+            with gr.Accordion("Outpainting", open=False, elem_id='ddsd_outpaint_acc'):
+                with gr.Column():
+                    outpaint_target_info = gr.HTML('<br><p style="margin-bottom:0.75em">I2I Outpainting</p>')
+                    disable_outpaint = gr.Checkbox(label='Disable Outpaint', elem_id='disable_outpaint', value=True, visible=True)
+                    outpaint_sample = gr.Dropdown(label='Outpaint Sampling', elem_id='outpaint_sample', choices=sample_list, value=sample_list[0], visible=False, type="value")
+                    with gr.Tabs(elem_id = 'outpaint_arguments', visible=False) as outpaint_tabs_acc:
+                        for outpaint_index in range(shared.opts.data.get('outpaint_count', 1)):
+                            with gr.Tab(f'Outpaint {outpaint_index + 1} Argument', elem_id=f'outpaint_{outpaint_index+1}_argument_tab'):
+                                outpaint_pixels = gr.Slider(label=f'Outpaint {outpaint_index+1} Pixels', minimum=0, maximum=256, value=64, step=16)
+                                outpaint_direction = gr.Radio(choices=['None', 'Left','Right','Up','Down'], value='None', label=f'Outpaint {outpaint_index+1} Direction')
+                                with gr.Row():
+                                    outpaint_positive = gr.Textbox(label=f'Positive {outpaint_index+1} Prompt', show_label=True, lines=2, placeholder='Outpaint Positive Prompt(Empty is Original)')
+                                    outpaint_negative = gr.Textbox(label=f'Negative {outpaint_index+1} Prompt', show_label=True, lines=2, placeholder='Outpaint Negative Prompt(Empty is Original)')
+                                outpaint_denoise = gr.Slider(label=f'Outpaint {outpaint_index+1} Denoise', minimum=0, maximum=1.0, step=0.01, value=0.8)
+                                outpaint_cfg = gr.Slider(label=f'Outpaint {outpaint_index+1} CFG(0 To Original)', minimum=0, maximum=500, step=0.5, value=0)
+                                outpaint_steps = gr.Slider(label=f'Outpaint {outpaint_index+1} Steps(0 To Original)', minimum=0, maximum=150, step=1, value=0)
+                            outpaint_positive_list.append(outpaint_positive)
+                            outpaint_negative_list.append(outpaint_negative)
+                            outpaint_denoise_list.append(outpaint_denoise)
+                            outpaint_cfg_list.append(outpaint_cfg)
+                            outpaint_steps_list.append(outpaint_steps)
+                            outpaint_pixels_list.append(outpaint_pixels)
+                            outpaint_direction_list.append(outpaint_direction)
+                        outpaint_tabs = outpaint_tabs_acc
+                    outpaint_mask_blur = gr.Slider(label='Outpaint Blur', elem_id='outpaint_mask_blur', minimum=0, maximum=128, step=4, value=8, visible=False)
         
             with gr.Accordion("Upscaler", open=False, elem_id="ddsd_upscaler_acc"):
                 with gr.Column():
@@ -394,7 +431,15 @@ class Script(modules.scripts.Script):
                                 outputs=watermark_type_change_func2(watermark_image, watermark_image_size_width, watermark_image_size_height, watermark_text, watermark_text_color, watermark_text_font, watermark_text_size)
                             )
                         watermark_tabs = watermark_tabs_acc
-        
+        disable_outpaint.change(
+            lambda disable:{
+                outpaint_sample:gr_show(not disable),
+                outpaint_tabs:gr_show(not disable),
+                outpaint_mask_blur:gr_show(not disable)
+            },
+            inputs=[disable_outpaint],
+            outputs=[outpaint_sample, outpaint_tabs, outpaint_mask_blur]
+        )
         disable_watermark.change(
             lambda disable:{
                 watermark_tabs:gr_show(not disable)
@@ -464,6 +509,7 @@ class Script(modules.scripts.Script):
         ret += [disable_watermark, disable_postprocess]
         ret += [disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength, upscaler_ckpt, upscaler_vae]
         ret += [disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model, dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur]
+        ret += [disable_outpaint, outpaint_sample, outpaint_mask_blur]
         ret += dino_detection_ckpt_list + \
                 dino_detection_vae_list + \
                 dino_detection_prompt_list + \
@@ -499,13 +545,20 @@ class Script(modules.scripts.Script):
                 pp_bilateral_sigmaC_list + \
                 pp_bilateral_sigmaS_list + \
                 pp_color_tint_type_name_list + \
-                pp_color_tint_lut_name_list
+                pp_color_tint_lut_name_list + \
+                outpaint_positive_list + \
+                outpaint_negative_list + \
+                outpaint_denoise_list + \
+                outpaint_cfg_list + \
+                outpaint_steps_list + \
+                outpaint_pixels_list + \
+                outpaint_direction_list
 
         def ds(*args):
             args = list(args)
             ddsd_save_path = args[0]
             args = args[1:]
-            enable_script_names,disable_watermark,disable_postprocess,disable_upscaler,ddetailer_before_upscaler,scalevalue,upscaler_sample,overlap,upscaler_index,rewidth,reheight,denoising_strength,upscaler_ckpt,upscaler_vae,disable_detailer,disable_mask_paint_mode,inpaint_mask_mode,detailer_sample,detailer_sam_model,detailer_dino_model,dino_full_res_inpaint,dino_inpaint_padding,detailer_mask_blur = args[:23]
+            enable_script_names,disable_watermark,disable_postprocess,disable_upscaler,ddetailer_before_upscaler,scalevalue,upscaler_sample,overlap,upscaler_index,rewidth,reheight,denoising_strength,upscaler_ckpt,upscaler_vae,disable_detailer,disable_mask_paint_mode,inpaint_mask_mode,detailer_sample,detailer_sam_model,detailer_dino_model,dino_full_res_inpaint,dino_inpaint_padding,detailer_mask_blur,disable_outpaint, outpaint_sample, outpaint_mask_blur = args[:26]
             result = {}
             result['enable_script_names'] = enable_script_names
             result['disable_watermark'] = disable_watermark
@@ -530,7 +583,10 @@ class Script(modules.scripts.Script):
             result['dino_full_res_inpaint'] = dino_full_res_inpaint
             result['dino_inpaint_padding'] = dino_inpaint_padding
             result['detailer_mask_blur'] = detailer_mask_blur
-            args = args[23:]
+            result['disable_outpaint'] = disable_outpaint
+            result['outpaint_sample'] = outpaint_sample
+            result['outpaint_mask_blur'] = outpaint_mask_blur
+            args = args[26:]
             result['dino_detect_count'] = shared.opts.data.get('dino_detect_count', 2)
             for index in range(result['dino_detect_count']):
                 result[f'dino_detection_ckpt_{index+1}'] = args[index + result['dino_detect_count'] * 0]
@@ -575,6 +631,17 @@ class Script(modules.scripts.Script):
                 result[f'pp_bilateral_sigmaS_{index+1}'] = args[index + result['postprocessing_count'] * 11]
                 result[f'pp_color_tint_type_name_{index+1}'] = args[index + result['postprocessing_count'] * 12]
                 result[f'pp_color_tint_lut_name_{index+1}'] = args[index + result['postprocessing_count'] * 13]
+            args = args[result['postprocessing_count'] * 13:]
+            result['outpaint_count'] = shared.opts.data.get('outpaint_count', 1)
+            for index in range(result['outpaint_count']):
+                result[f'outpaint_positive_{index+1}'] = args[index + result['outpaint_count'] * 0]
+                result[f'outpaint_negative_{index+1}'] = args[index + result['outpaint_count'] * 1]
+                result[f'outpaint_denoise_{index+1}'] = args[index + result['outpaint_count'] * 2]
+                result[f'outpaint_cfg_{index+1}'] = args[index + result['outpaint_count'] * 3]
+                result[f'outpaint_steps_{index+1}'] = args[index + result['outpaint_count'] * 4]
+                result[f'outpaint_pixels_{index+1}'] = args[index + result['outpaint_count'] * 5]
+                result[f'outpaint_direction_{index+1}'] = args[index + result['outpaint_count'] * 6]
+            args = args[result['outpaint_count'] * 6:]
             if not os.path.exists(ddsd_config_path):
                 os.mkdir(ddsd_config_path)
             with open(os.path.join(ddsd_config_path, f'{ddsd_save_path}.ddcfg'), 'w', encoding='utf-8') as f:
@@ -586,7 +653,7 @@ class Script(modules.scripts.Script):
         def dl(ddsd_load_path):
             with open(os.path.join(ddsd_config_path, f'{ddsd_load_path}.ddcfg'), 'r', encoding='utf-8') as f:
                 result = json_read(f)
-            results = [result['enable_script_names'],result['disable_watermark'],result['disable_postprocess'],result['disable_upscaler'],result['ddetailer_before_upscaler'],result['scalevalue'],result['upscaler_sample'],result['overlap'],result['upscaler_index'],result['rewidth'],result['reheight'],result['denoising_strength'],result['upscaler_ckpt'],result['upscaler_vae'],result['disable_detailer'],result['disable_mask_paint_mode'],result['inpaint_mask_mode'],result['detailer_sample'],result['detailer_sam_model'],result['detailer_dino_model'],result['dino_full_res_inpaint'],result['dino_inpaint_padding'],result['detailer_mask_blur']]
+            results = [result['enable_script_names'],result['disable_watermark'],result['disable_postprocess'],result['disable_upscaler'],result['ddetailer_before_upscaler'],result['scalevalue'],result['upscaler_sample'],result['overlap'],result['upscaler_index'],result['rewidth'],result['reheight'],result['denoising_strength'],result['upscaler_ckpt'],result['upscaler_vae'],result['disable_detailer'],result['disable_mask_paint_mode'],result['inpaint_mask_mode'],result['detailer_sample'],result['detailer_sam_model'],result['detailer_dino_model'],result['dino_full_res_inpaint'],result['dino_inpaint_padding'],result['detailer_mask_blur'],result['disable_outpaint'],result['outpaint_sample'],result['outpaint_mask_blur']]
             def result_create(token,file_count,count, default):
                 data = file_count if file_count < count else count
                 temp = []
@@ -633,11 +700,93 @@ class Script(modules.scripts.Script):
             results += result_create('pp_bilateral_sigmaS',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 10)
             results += result_create('pp_color_tint_type_name',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 'warm')
             results += result_create('pp_color_tint_lut_name',result['postprocessing_count'], shared.opts.data.get('postprocessing_count', 1), 'FGCineBasic.cube')
+            
+            result += result_create('outpaint_positive', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), '')
+            result += result_create('outpaint_negative', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), '')
+            result += result_create('outpaint_denoise', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), 0.8)
+            result += result_create('outpaint_cfg', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), 0)
+            result += result_create('outpaint_steps', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), 0)
+            result += result_create('outpaint_pixels', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), 64)
+            result += result_create('outpaint_direction', result['outpaint_count'], shared.opts.data.get('outpaint_count', 1), 'None')
             return dict(zip(ret, [gr_value_refresh(x) for x in results]))
         ddsd_save.click(ds, inputs=[ddsd_save_path]+ret, outputs=[ddsd_load_path])
         ddsd_load.click(dl, inputs=[ddsd_load_path], outputs=ret)
         
         return ret
+    
+    def outpainting(self, p, init_image, 
+                    outpaint_sample, outpaint_mask_blur, outpaint_count,
+                    outpaint_denoise_list, outpaint_cfg_list, outpaint_steps_list, outpaint_positive_list, outpaint_negative_list,
+                    outpaint_pixels_list, outpaint_direction_list):
+        
+        for outpaint_index in range(outpaint_count):
+            if outpaint_direction_list[outpaint_index] == 'None': continue
+            is_horiz = outpaint_direction_list[outpaint_index] in ['Left','Right']
+            is_vert = outpaint_direction_list[outpaint_index] in ['Up','Down']
+            
+            target_w = init_image.width + (outpaint_pixels_list[outpaint_index] if is_horiz else 0)
+            target_h = init_image.height + (outpaint_pixels_list[outpaint_index] if is_vert else 0)
+            
+            image = Image.new('RGB', (target_w,target_h))
+            image.paste(init_image, 
+                        (outpaint_pixels_list[outpaint_index] if outpaint_direction_list[outpaint_index] == 'Left' else 0, 
+                         outpaint_pixels_list[outpaint_index] if outpaint_direction_list[outpaint_index] == 'Up' else 0))
+            mask = Image.new('L', (target_w, target_h), 'white')
+            mask_draw = ImageDraw.Draw(mask)
+            
+            mask_draw.rectangle((
+                (outpaint_pixels_list[outpaint_index] + outpaint_mask_blur * 2) if outpaint_direction_list[outpaint_index] == 'Left' else 0,
+                (outpaint_pixels_list[outpaint_index] + outpaint_mask_blur * 2) if outpaint_direction_list[outpaint_index] == 'Up' else 0,
+                (mask.width - outpaint_pixels_list[outpaint_index] - outpaint_mask_blur * 2) if outpaint_direction_list[outpaint_index] == 'Right' else target_w,
+                (mask.height - outpaint_pixels_list[outpaint_index] - outpaint_mask_blur * 2) if outpaint_direction_list[outpaint_index] == 'Down' else target_h
+                ), fill='black')
+            
+            latent_mask = Image.new('L', (target_w, target_h), 'white')
+            latent_mask_draw = ImageDraw.Draw(latent_mask)
+            latent_mask_draw.rectangle((
+                (outpaint_pixels_list[outpaint_index] + outpaint_mask_blur // 2) if outpaint_direction_list[outpaint_index] == 'Left' else 0,
+                (outpaint_pixels_list[outpaint_index] + outpaint_mask_blur // 2) if outpaint_direction_list[outpaint_index] == 'Up' else 0,
+                (mask.width - outpaint_pixels_list[outpaint_index] - outpaint_mask_blur // 2) if outpaint_direction_list[outpaint_index] == 'Right' else target_w,
+                (mask.height - outpaint_pixels_list[outpaint_index] - outpaint_mask_blur // 2) if outpaint_direction_list[outpaint_index] == 'Down' else target_h
+            ), fill='black')
+            
+            devices.torch_gc()
+            
+            pi = I2I_Generator_Create(
+                p, ('Euler' if p.sampler_name in ['PLMS', 'UniPC', 'DDIM'] else p.sampler_name) if outpaint_sample == 'Original' else outpaint_sample,
+                outpaint_mask_blur * 2, False, 0, image,
+                outpaint_denoise_list[outpaint_index],
+                outpaint_cfg_list[outpaint_index] if outpaint_cfg_list[outpaint_index] > 0 else p.cfg_scale,
+                outpaint_steps_list[outpaint_index] if outpaint_steps_list[outpaint_index] > 0 else p.steps,
+                target_w, 
+                target_h, 
+                p.tiling, p.scripts, self.i2i_scripts, self.i2i_scripts_always, p.script_args,
+                outpaint_positive_list[outpaint_index] if outpaint_positive_list[outpaint_index] else self.target_prompts,
+                outpaint_negative_list[outpaint_index] if outpaint_negative_list[outpaint_index] else self.target_negative_prompts,
+                0
+            )
+            
+            
+            pi.image_mask = mask
+            pi.latent_mask = latent_mask
+            pi.seed = self.target_seeds + outpaint_index
+            
+            state.job_count += 1
+            proc = processing.process_images(pi)
+            
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Direction'] = outpaint_direction_list[outpaint_index]
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Pixels'] = outpaint_pixels_list[outpaint_index]
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Positive'] = proc.all_prompts[0] if outpaint_positive_list[outpaint_index] else "Original"
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Negative'] = proc.all_negative_prompts[0] if outpaint_negative_list[outpaint_index] else "Original"
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Denoising'] = pi.denoising_strength
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} CFG Scale'] = pi.cfg_scale
+            p.extra_generation_params[f'Outpaint {outpaint_index + 1} Steps'] = pi.steps
+            
+            init_image = proc.images[0]
+            
+        return init_image
+        
+        
     
     def dino_detect_detailer(self, p, init_image,
                              disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
@@ -912,6 +1061,7 @@ class Script(modules.scripts.Script):
             disable_upscaler, ddetailer_before_upscaler, scalevalue, upscaler_sample, overlap, upscaler_index, rewidth, reheight, denoising_strength, upscaler_ckpt, upscaler_vae,
             disable_detailer, disable_mask_paint_mode, inpaint_mask_mode, detailer_sample, detailer_sam_model, detailer_dino_model,
             dino_full_res_inpaint, dino_inpaint_padding, detailer_mask_blur,
+            disable_outpaint, outpaint_sample, outpaint_mask_blur,
             *args):
         if getattr(p, 'sub_processing', False): return
         self.image_results = []
@@ -942,6 +1092,9 @@ class Script(modules.scripts.Script):
         self.dino_full_res_inpaint = dino_full_res_inpaint
         self.dino_inpaint_padding = dino_inpaint_padding
         self.detailer_mask_blur = detailer_mask_blur
+        self.disable_outpaint = disable_outpaint
+        self.outpaint_sample = outpaint_sample
+        self.outpaint_mask_blur = outpaint_mask_blur
         args_list = [*args]
         self.dino_detect_count = shared.opts.data.get('dino_detect_count', 2)
         self.dino_detection_ckpt_list = args_list[self.dino_detect_count * 0:self.dino_detect_count * 1]
@@ -982,6 +1135,14 @@ class Script(modules.scripts.Script):
         self.pp_bilateral_sigmaS_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 11:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 12]
         self.pp_color_tint_type_name_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 12:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 13]
         self.pp_color_tint_lut_name_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 13:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14]
+        self.outpaint_count = shared.opts.data.get('outpaint_count', 1)
+        self.outpaint_positive_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 0:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 1]
+        self.outpaint_negative_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 1:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 2]
+        self.outpaint_denoise_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 2:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 3]
+        self.outpaint_cfg_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 3:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 4]
+        self.outpaint_steps_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 4:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 5]
+        self.outpaint_pixels_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 5:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 6]
+        self.outpaint_direction_list = args_list[self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 6:self.dino_detect_count * 11 + self.watermark_count * 11 + self.pp_count * 14 + self.outpaint_count * 7]
         self.script_names_list = [x.strip()+'.py' for x in enable_script_names.split(';') if len(x) > 1]
         self.script_names_list += [os.path.basename(__file__)]
         self.i2i_scripts = [x for x in self.original_scripts if os.path.basename(x.filename) in self.script_names_list].copy()
@@ -1016,6 +1177,13 @@ class Script(modules.scripts.Script):
                               self.target_seeds, self.target_prompts, opts.samples_format, 
                               suffix= '' if shared.opts.data.get('save_ddsd_working_on_images_suffix', '') == '' else f"-{shared.opts.data.get('save_ddsd_working_on_images_suffix', '')}",
                               info=create_infotext(p, p.all_prompts, p.all_seeds, p.all_subseeds, None, self.iter_number, self.batch_number), p=p)
+        
+        if not self.disable_outpaint:
+            output_image = self.outpainting(p, output_image,
+                                            self.outpaint_sample, self.outpaint_mask_blur, self.outpaint_count, 
+                                            self.outpaint_denoise_list, self.outpaint_cfg_list, self.outpaint_steps_list, 
+                                            self.outpaint_positive_list, self.outpaint_negative_list, self.outpaint_pixels_list,self.outpaint_direction_list)
+        devices.torch_gc()
         
         if self.ddetailer_before_upscaler and not self.disable_upscaler:
             output_image = self.upscale(p, output_image,
@@ -1087,6 +1255,9 @@ def on_ui_settings():
     shared.opts.add_option("save_ddsd_working_on_images_suffix", shared.OptionInfo(
         'Working_On', "Save all images you are working on suffix", gr.Textbox, {"interactive": True}, section=section))
     
+    shared.opts.add_option("outpaint_count", shared.OptionInfo(
+        1, "Outpainting Max Count", gr.Slider, {"minimum": 1, "maximum": 20, "step": 1}, section=section))
+        
     shared.opts.add_option("save_ddsd_working_on_dino_mask_images", shared.OptionInfo(
         False, "Save dino mask images you are working on", gr.Checkbox, {"interactive": True}, section=section))
     shared.opts.add_option("save_ddsd_working_on_dino_mask_images_prefix", shared.OptionInfo(
